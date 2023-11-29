@@ -1,7 +1,11 @@
 {
-    "build": { "dockerfile": "Dockerfile" },
+    "build": {
+        "dockerfile": "Dockerfile"
+    },
     "remoteUser": "vscode",
-    "capAdd": ["SYS_PTRACE"],
+    "capAdd": [
+        "SYS_PTRACE"
+    ],
     "customizations": {
         "vscode": {
             "extensions": [
@@ -22,7 +26,11 @@
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "bash",
-                "terminal.integrated.profiles.linux": { "bash": { "path": "/bin/bash" } }
+                "terminal.integrated.profiles.linux": {
+                    "bash": {
+                        "path": "/bin/bash"
+                    }
+                }
             }
         }
     },

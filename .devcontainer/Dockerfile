@@ -6,7 +6,7 @@ ARG USER_GID=$USER_UID
 ENV SHELL /bin/bash
 
 RUN apt-get update && \
-    apt-get install -y git python3.11 python3.11-dev ninja-build gdb && \ 
+    apt-get install -y git python3.11 python3.11-dev ninja-build gdb nano && \ 
     groupadd --gid $USER_GID $USERNAME && \
     useradd --uid $USER_UID --gid $USER_GID -m $USERNAME -s $SHELL
 
