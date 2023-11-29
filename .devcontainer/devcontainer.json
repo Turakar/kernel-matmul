@@ -1,0 +1,39 @@
+{
+    "build": { "dockerfile": "Dockerfile" },
+    "remoteUser": "vscode",
+    "capAdd": ["SYS_PTRACE"],
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "github.copilot",
+                "github.copilot-chat",
+                "ms-toolsai.vscode-jupyter-cell-tags",
+                "ms-toolsai.jupyter-renderers",
+                "ms-python.python",
+                "ms-python.vscode-pylance",
+                "njqdev.vscode-python-typehint",
+                "tamasfe.even-better-toml",
+                "nvidia.nsight-vscode-edition",
+                "ms-vscode.cpptools",
+                "ms-vscode.cpptools-themes",
+                "benjamin-simmonds.pythoncpp-debug",
+                "ms-azuretools.vscode-docker",
+                "redhat.vscode-yaml"
+            ],
+            "settings": {
+                "terminal.integrated.defaultProfile.linux": "bash",
+                "terminal.integrated.profiles.linux": { "bash": { "path": "/bin/bash" } }
+            }
+        }
+    },
+    "runArgs": [
+        "--runtime=nvidia",
+        "--gpus",
+        "all",
+        "--rm"
+    ],
+    "features": {
+        "ghcr.io/devcontainers-contrib/features/poetry:2": {}
+    },
+    "postStartCommand": "poetry install"
+}

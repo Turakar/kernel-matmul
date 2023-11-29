@@ -1,0 +1,34 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python/C++/CUDA Debug",
+            "type": "pythoncpp",
+            "request": "launch",
+            "pythonConfig": "custom",
+            "pythonLaunchName": "Python/C++/CUDA Debug (Python)",
+            "cppConfig": "custom",
+            "cppAttachName": "Python/C++/CUDA Debug (C++/CUDA)"
+        },
+        {
+            "name": "Python/C++/CUDA Debug (Python)",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "env": {
+                "KERNEL_MATMUL_COMPILE_DEBUG": "true",
+                "KERNEL_MATMUL_COMPILE_VERBOSE": "true"
+            }
+        },
+        {
+            "name": "Python/C++/CUDA Debug (C++/CUDA)",
+            "type": "cuda-gdb",
+            "request": "attach",
+            "processId": ""
+        }
+    ]
+}

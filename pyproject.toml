@@ -1,3 +1,7 @@
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
+
 [tool.poetry]
 name = "kernel-matmul"
 version = "0.1.0"
@@ -6,9 +10,13 @@ authors = ["Turakar <turakar23@gmail.com>"]
 readme = "README.md"
 
 [tool.poetry.dependencies]
-python = "^3.11"
+python = "^3.11,<3.12"
+torch = "^2.1.1"
+gpytorch = "^1.11"
 
+[tool.poetry.group.dev.dependencies]
+pre-commit = "^3.5.0"
 
-[build-system]
-requires = ["poetry-core"]
-build-backend = "poetry.core.masonry.api"
+[tool.ruff]
+line-length = 100
+extend-include = ["*.ipynb"]
