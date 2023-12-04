@@ -1,47 +1,87 @@
 import os
+from typing import Any
+import warnings
 
 import torch
-import torch.utils.cpp_extension
 from gpytorch.kernels.kernel import sq_dist
 from torch import Tensor
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore", category=DeprecationWarning, message="pkg_resources is deprecated as an API"
+    )
+    import torch.utils.cpp_extension
 
 _BLOCK_SIZE = 128
 
 
-def load_extension(
+def load_native(
     name: str,
-    sources: list[str],
-    extra_cflags: list[str] | None = None,
-    extra_cuda_cflags: list[str] | None = None,
+    defines: list[dict[str, Any]] | None = None,
 ) -> None:
-    if extra_cflags is None:
-        extra_cflags = []
-    if extra_cuda_cflags is None:
-        extra_cuda_cflags = []
     debug = os.environ.get("KERNEL_MATMUL_COMPILE_DEBUG", "false") == "true"
+    print_sizes = os.environ.get("KERNEL_MATMUL_COMPILE_PRINT_SIZES", "false") == "true"
     verbose = os.environ.get("KERNEL_MATMUL_COMPILE_VERBOSE", "false") == "true"
+
+    if defines is None:
+        defines = {}
+
+    source_ext = (".cpp", ".cu")
+    common_path = os.path.join("native", "common")
+    sources = [
+        os.path.join(common_path, filename)
+        for filename in os.listdir(common_path)
+        if filename.endswith(source_ext)
+    ]
+    module_path = os.path.join("native", name)
+    sources += [
+        os.path.join(module_path, filename)
+        for filename in os.listdir(module_path)
+        if filename.endswith(source_ext)
+    ]
+
+    torch_name = f"km__{name}"
+    flags = []
+    cpp_flags = []
+    cuda_flags = []
+    for k, v in defines.items():
+        if v is not None:
+            flags.append(f"-DKM_{k}={v}")
+            torch_name += f"__{k}__{v}"
+        else:
+            flags.append(f"-DKM_{k}")
+            torch_name += f"__{k}"
     if debug:
-        extra_cflags.append("-g")
-        extra_cuda_cflags += ["-g", "-G"]
+        flags.append("-DKM_DEBUG_GPU_ASSERT")
+        cpp_flags.append("-g")
+        cuda_flags += ["-g", "-G"]
+        torch_name += "__debug"
     else:
-        extra_cflags.append("-O3")
+        cpp_flags.append("-O3")
+    if print_sizes:
+        flags.append("-DKM_DEBUG_PRINT_SIZES")
+        torch_name += "__print_sizes"
     return torch.utils.cpp_extension.load(
-        name=name,
+        name=torch_name,
         sources=sources,
-        extra_cflags=extra_cflags,
-        extra_cuda_cflags=extra_cuda_cflags,
+        extra_cflags=cpp_flags + flags,
+        extra_cuda_cflags=cuda_flags + flags,
         verbose=verbose,
     )
 
 
-native = load_extension(
-    name="kernel_matmul",
-    sources=["native/kernel_matmul.cpp", "native/kernel_matmul.cu"],
-    extra_cuda_cflags=[f"-DKERNEL_MATMUL_BLOCK_SIZE={_BLOCK_SIZE}"],
-)
-
-
 def main():
+    native = load_native(
+        name="matmul",
+        defines={
+            "BLOCK_SIZE": _BLOCK_SIZE,
+            "MATMUL_THREADS": 64,
+            "MATMUL_PER_THREAD": 2,
+            "MATMUL_K_BLOCK_SIZE": 11,
+            "KERNEL_SPECTRAL": None,
+        },
+    )
+
     m = 1000
     n = 1000
     b = 5
@@ -56,7 +96,7 @@ def main():
         end,
     ) = make_example_data(m, n, b, k, kernel_type)
     kernel = reference_kernel(x1, x2, params, start, end, kernel_type)
-    result = native.kernel_matmul_spectral(x1, x2, rhs, params, start, end)
+    result = native.call(x1, x2, rhs, params, start, end)
     reference = kernel @ rhs
     assert torch.allclose(reference, result, atol=2e-3)
 
