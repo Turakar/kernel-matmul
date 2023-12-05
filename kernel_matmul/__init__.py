@@ -40,27 +40,27 @@ def load_native(
         if filename.endswith(source_ext)
     ]
 
-    torch_name = f"km__{name}"
+    torch_name = f"km___{name}"
     flags = []
     cpp_flags = []
     cuda_flags = []
     for k, v in defines.items():
         if v is not None:
             flags.append(f"-DKM_{k}={v}")
-            torch_name += f"__{k}__{v}"
+            torch_name += f"___{k}__{v}"
         else:
             flags.append(f"-DKM_{k}")
-            torch_name += f"__{k}"
+            torch_name += f"___{k}"
     if debug:
         flags.append("-DKM_DEBUG_GPU_ASSERT")
         cpp_flags.append("-g")
         cuda_flags += ["-g", "-G"]
-        torch_name += "__debug"
+        torch_name += "___debug"
     else:
         cpp_flags.append("-O3")
     if print_sizes:
         flags.append("-DKM_DEBUG_PRINT_SIZES")
-        torch_name += "__print_sizes"
+        torch_name += "___print_sizes"
     return torch.utils.cpp_extension.load(
         name=torch_name,
         sources=sources,

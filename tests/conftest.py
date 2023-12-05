@@ -10,7 +10,7 @@ from gpytorch.kernels import (
     PeriodicKernel,
 )
 
-from kernel_matmul.make_ranges import make_ranges_block
+from kernel_matmul.ranges import make_ranges
 
 
 @dataclass
@@ -45,7 +45,7 @@ def example_data(request) -> ExampleData:
     rhs = torch.randn(n, k, device=device, dtype=torch.float32)
     rhs = rhs / torch.linalg.norm(rhs, dim=0, keepdim=True)
 
-    start, end = make_ranges_block(cutoff, x1, x2)
+    start, end = make_ranges(cutoff, x1, x2)
 
     if kernel_type == "rbf":
         lengthscale = 1 + torch.rand(b, device=device, dtype=torch.float32)

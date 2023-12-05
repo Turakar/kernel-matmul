@@ -29,6 +29,32 @@
             "type": "cuda-gdb",
             "request": "attach",
             "processId": ""
-        }
+        },
+        {
+            "name": "pytest",
+            "type": "pythoncpp",
+            "request": "launch",
+            "pythonConfig": "custom",
+            "pythonLaunchName": "pytest (Python)",
+            "cppConfig": "custom",
+            "cppAttachName": "pytest (C++/CUDA)"
+        },
+        {
+            "name": "pytest (Python)",
+            "type": "python",
+            "request": "launch",
+            "module": "pytest",
+            "console": "integratedTerminal",
+            "env": {
+                "KERNEL_MATMUL_COMPILE_DEBUG": "true",
+                "KERNEL_MATMUL_COMPILE_VERBOSE": "true"
+            }
+        },
+        {
+            "name": "pytest (C++/CUDA)",
+            "type": "cuda-gdb",
+            "request": "attach",
+            "processId": ""
+        },
     ]
 }

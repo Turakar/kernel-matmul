@@ -14,12 +14,12 @@
                 "ms-toolsai.vscode-jupyter-cell-tags",
                 "ms-toolsai.jupyter-renderers",
                 "ms-python.python",
-                "ms-python.vscode-pylance",
                 "njqdev.vscode-python-typehint",
                 "tamasfe.even-better-toml",
                 "nvidia.nsight-vscode-edition",
                 "ms-vscode.cpptools",
                 "ms-vscode.cpptools-themes",
+                "ms-python.vscode-pylance",
                 "benjamin-simmonds.pythoncpp-debug",
                 "ms-azuretools.vscode-docker",
                 "redhat.vscode-yaml"
