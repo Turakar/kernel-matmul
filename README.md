@@ -2,12 +2,14 @@
 
 Accelerated multiplications with kernel matrices.
 
-## Add C++/CUDA debug information
-You can add debug information for VSCode using the `compile_commands.json` file.
-This file contains the compile commands for a Torch extension build with Ninja.
-The provided VSCode configurations expect this file in the root directory of the project.
-As the file is specific to one extension, we provide a utility script `compile_commands.py` which creates a `compile_commands.json` which contains the concatenation of compilation commands for all extensions cached.
+## Add C++/CUDA IntelliSense information
+We provide a default VSCode configuration in `.vscode`.
+This refers to a folder of include paths named `include` in the project root.
+You can create this folder using the provided script `find_include_paths.py`:
 
 ```python
-python compile_commands.py
+python find_include_paths.py
 ```
+
+This script creates the `include` directory, queries Torch and Python for the include paths and symlinks them to the `include` directory.
+You can then use the VSCode configuration to work with the C++/CUDA code.

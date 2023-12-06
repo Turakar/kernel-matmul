@@ -2,8 +2,22 @@
     "configurations": [
         {
             "name": "Linux",
-            "compileCommands": "${workspaceFolder}/compile_commands.json",
-            "intelliSenseMode": "linux-gcc-x64"
+            "includePath": [
+                "${workspaceFolder}/native/**",
+                "${workspaceFolder}/include/**"
+            ],
+            "defines": [
+                "KM_KERNEL_RBF",
+                "KM_BLOCK_SIZE=128",
+                "KM_MATMUL_K_BLOCK_SIZE=32",
+                "KM_MATMUL_THREADS=64",
+                "KM_MATMUL_PER_THREAD=2",
+                "KM_BILINEAR_DERIVATIVE_THREAD_DIM=16",
+                "KM_BILINEAR_DERIVATIVE_PER_THREAD=8"
+            ],
+            "intelliSenseMode": "linux-gcc-x64",
+            "cStandard": "c17",
+            "cppStandard": "c++17"
         }
     ],
     "version": 4,

@@ -7,8 +7,7 @@
 #elif defined(KM_KERNEL_SPECTRAL)
 #define KM_NUM_PARAMS 3
 #else
-#define KM_KERNEL_RBF
-#define KM_NUM_PARAMS 2
+#error "No kernel function defined"
 #endif
 
 #include <array>
