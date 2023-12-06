@@ -11,6 +11,7 @@ from gpytorch.kernels import (
 )
 
 from kernel_matmul.ranges import make_ranges
+from kernel_matmul import _BLOCK_SIZE
 
 
 @dataclass
@@ -123,6 +124,9 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
         kernel = gpytorch_kernel(example_data.x1[:, None], example_data.x2[:, None]).to_dense()
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
+    for i in range(example_data.start.shape[0]):
+        kernel[..., i * _BLOCK_SIZE : (i + 1) * _BLOCK_SIZE, : example_data.start[i]] = 0.0
+        kernel[..., i * _BLOCK_SIZE : (i + 1) * _BLOCK_SIZE, example_data.end[i] :] = 0.0
     return kernel
 
 

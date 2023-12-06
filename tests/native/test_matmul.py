@@ -28,4 +28,4 @@ def test_matmul(example_data: ExampleData, reference_kernel: Tensor, debug_build
         example_data.end,
     )
     reference = reference_kernel @ example_data.rhs
-    assert torch.allclose(reference, result, atol=2e-3)
+    assert torch.allclose(reference, result, atol=1e-4)
