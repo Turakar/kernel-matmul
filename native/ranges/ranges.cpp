@@ -63,21 +63,21 @@ std::array<torch::Tensor, 2> make_ranges_symmetric(const torch::Tensor x_any, co
     auto end = torch::zeros({rows}, torch::kInt32);
 
     for (int i = 0; i < rows; i++) {
-        const int row_last = std::min((i + 1) * block_size - 1, (int)x.size(0));
+        const int row_last = std::min((i + 1) * block_size, (int)x.size(0)) - 1;
         int j;
         if (i == 0) {
             j = block_size;
         } else {
             j = end[i - 1].item<int>();
         }
-        for (; j < x.size(0); j += block_size) {
+        for (; j < x.size(0); j = std::min(j + block_size, (int)x.size(0))) {
             const auto tau = x[j].item<float>() - x[row_last].item<float>();
             if (tau >= cutoff) {
                 break;
             }
         }
         end[i] = j;
-        for (int k = i; k < j / block_size; k++) {
+        for (int k = i; k < KM_CEIL_DIV(j, block_size); k++) {
             start[k] = std::min(start[k].item<int>(), i * block_size);
         }
     }
