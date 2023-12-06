@@ -4,7 +4,10 @@
         "*.excalidrawlib": "json",
         "*.tcc": "cpp",
         "random": "cpp",
-        "array": "cpp"
+        "array": "cpp",
+        "cmath": "cpp",
+        "complex": "cpp",
+        "valarray": "cpp"
     },
     "python.testing.pytestArgs": [
         "tests"

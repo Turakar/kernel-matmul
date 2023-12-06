@@ -22,7 +22,7 @@ __device__ __forceinline__ float kernel_function(const float x1, const float x2,
     const float lengthscale_rbf = params[0];
     const float outputscale = params[1];
     const float diff = x1 - x2;
-    const float rbf = diff * diff / lengthscale_rbf / lengthscale_rbf / ((float)2);
+    const float rbf = diff * diff / lengthscale_rbf / lengthscale_rbf / 2.0f;
     return outputscale * exp(-rbf);
 
 #elif defined(KM_KERNEL_LOCALLY_PERIODIC)
@@ -31,9 +31,9 @@ __device__ __forceinline__ float kernel_function(const float x1, const float x2,
     const float period_length = params[2];
     const float outputscale = params[3];
     const float diff = x1 - x2;
-    const float rbf = diff * diff / lengthscale_rbf / lengthscale_rbf / ((float)2);
+    const float rbf = diff * diff / lengthscale_rbf / lengthscale_rbf / 2.0f;
     const float periodic_inner = sin(CONSTANT_PI_F * diff / period_length);
-    const float periodic = ((float)2) * periodic_inner * periodic_inner / lengthscale_periodic;
+    const float periodic = 2.0f * periodic_inner * periodic_inner / lengthscale_periodic;
     return outputscale * exp(-(rbf + periodic));
 
 #elif defined(KM_KERNEL_SPECTRAL)
@@ -42,7 +42,7 @@ __device__ __forceinline__ float kernel_function(const float x1, const float x2,
     const float outputscale = params[2];
 
     const float diff = x1 - x2;
-    const float rbf = diff * diff / lengthscale / lengthscale / ((float)2);
+    const float rbf = diff * diff / lengthscale / lengthscale / 2.0f;
     const float cos_term = cos(2.0f * CONSTANT_PI_F * frequency * diff);
     const float value = outputscale * exp(-rbf) * cos_term;
     return value;
@@ -60,7 +60,7 @@ kernel_function_bwd(const float x1, const float x2, const std::array<float, KM_N
     // forward pass
     const float diff = x1 - x2;
     const float diff_sq = diff * diff;
-    const float rbf = diff_sq / lengthscale_rbf / lengthscale_rbf / 2;
+    const float rbf = diff_sq / lengthscale_rbf / lengthscale_rbf / 2.0f;
     const float exp_term = exp(-rbf);
     const float value = outputscale * exp_term;
 
@@ -80,22 +80,23 @@ kernel_function_bwd(const float x1, const float x2, const std::array<float, KM_N
     // forward pass
     const float diff = x1 - x2;
     const float diff_sq = diff * diff;
-    const float rbf = diff_sq / lengthscale_rbf / lengthscale_rbf / 2;
-    const float periodic_inner = sin(diff / period_length);
-    const float periodic = 2 * periodic_inner * periodic_inner / lengthscale_periodic;
+    const float rbf = diff_sq / lengthscale_rbf / lengthscale_rbf / 2.0f;
+    const float sin_inner = CONSTANT_PI_F * diff / period_length;
+    const float periodic_inner = sin(sin_inner);
+    const float periodic = 2.0f * periodic_inner * periodic_inner / lengthscale_periodic;
     const float exp_term = exp(-(rbf + periodic));
     const float value = outputscale * exp_term;
 
     // backward pass
     // wolfram alpha:
-    // - D[α*Exp[-(0.5 *(x-y)^2/λ + 2 * (Sin[(x-y)/p])^2/μ)],λ]
-    // - D[α*Exp[-(0.5 *(x-y)^2/λ + 2 * (Sin[(x-y)/p])^2/μ)],μ]
-    // - D[α*Exp[-(0.5 *(x-y)^2/λ + 2 * (Sin[(x-y)/p])^2/μ)],p]
-    // - D[α*Exp[-(0.5 *(x-y)^2/λ + 2 * (Sin[(x-y)/p])^2/μ)],α]
+    // - D[α*Exp[-(0.5 *(x-y)^2/λ^2 + 2 * (Sin[π*(x-y)/p])^2/μ)],λ]
+    // - D[α*Exp[-(0.5 *(x-y)^2/λ^2 + 2 * (Sin[π*(x-y)/p])^2/μ)],μ]
+    // - D[α*Exp[-(0.5 *(x-y)^2/λ^2 + 2 * (Sin[π*(x-y)/p])^2/μ)],p]
+    // - D[α*Exp[-(0.5 *(x-y)^2/λ^2 + 2 * (Sin[π*(x-y)/p])^2/μ)],α]
     const float lengthscale_rbf_diff =
         value * diff_sq / (lengthscale_rbf * lengthscale_rbf * lengthscale_rbf);
     const float lengthscale_periodic_diff = value * periodic / lengthscale_periodic;
-    const float period_length_diff = value * 2 * sin(2 * diff / period_length) * diff /
+    const float period_length_diff = value * 2 * CONSTANT_PI_F * sin(2 * sin_inner) * diff /
                                      (lengthscale_periodic * period_length * period_length);
     const float outputscale_diff = exp_term;
 

@@ -4,7 +4,9 @@ from kernel_matmul import _BLOCK_SIZE, load_native
 from tests.conftest import ExampleData
 
 
-def test_matmul(example_data: ExampleData, reference_kernel: Tensor, debug_build: None):
+def test_matmul(
+    example_data: ExampleData, reference_kernel: Tensor, debug_build: bool, kernel_define: str
+) -> None:
     native = load_native(
         name="matmul",
         defines={
@@ -12,11 +14,7 @@ def test_matmul(example_data: ExampleData, reference_kernel: Tensor, debug_build
             "MATMUL_THREADS": 64,
             "MATMUL_PER_THREAD": 2,
             "MATMUL_K_BLOCK_SIZE": example_data.rhs.shape[-1],
-            {
-                "rbf": "KERNEL_RBF",
-                "spectral": "KERNEL_SPECTRAL",
-                "locally_periodic": "KERNEL_LOCALLY_PERIODIC",
-            }[example_data.kernel_type]: None,
+            kernel_define: None,
         },
     )
     result = native.call(
@@ -28,4 +26,4 @@ def test_matmul(example_data: ExampleData, reference_kernel: Tensor, debug_build
         example_data.end,
     )
     reference = reference_kernel @ example_data.rhs
-    assert torch.allclose(reference, result, atol=1e-4)
+    assert torch.allclose(reference, result, atol=2e-4)

@@ -8,6 +8,7 @@ from gpytorch.kernels import (
     SpectralMixtureKernel,
     ProductKernel,
     PeriodicKernel,
+    Kernel,
 )
 
 from kernel_matmul.ranges import make_ranges
@@ -30,6 +31,9 @@ class ExampleData:
         dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="rbf"),
         dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="spectral"),
         dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="locally_periodic"),
+        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="rbf"),
+        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="spectral"),
+        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="locally_periodic"),
     ]
 )
 def example_data(request) -> ExampleData:
@@ -68,6 +72,8 @@ def example_data(request) -> ExampleData:
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
 
+    params.requires_grad = True
+
     return ExampleData(
         x1=x1,
         x2=x2,
@@ -81,6 +87,15 @@ def example_data(request) -> ExampleData:
 
 @pytest.fixture
 def reference_kernel(example_data: ExampleData) -> Tensor:
+    def with_grads(kernel: Kernel, name: str, value: Tensor) -> None:
+        raw_name = f"raw_{name}"
+        constraint = kernel.constraint_for_parameter_name(raw_name)
+        if constraint is not None:
+            value = constraint.inverse_transform(value)
+        assert getattr(kernel, raw_name).shape == value.shape, name
+        delattr(kernel, raw_name)
+        setattr(kernel, raw_name, value)
+
     kernel_type = example_data.kernel_type
     params = example_data.params
     batch_shape = example_data.params.shape[1:]
@@ -89,8 +104,8 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
         outputscale = params[1]
         gpytorch_kernel = ScaleKernel(RBFKernel(batch_shape=batch_shape), batch_shape=batch_shape)
         gpytorch_kernel.to(example_data.x1.device)
-        gpytorch_kernel.outputscale = outputscale
-        gpytorch_kernel.base_kernel.lengthscale = lengthscale
+        with_grads(gpytorch_kernel, "outputscale", outputscale)
+        with_grads(gpytorch_kernel.base_kernel, "lengthscale", lengthscale[:, None, None])
         kernel = gpytorch_kernel(example_data.x1[:, None], example_data.x2[:, None]).to_dense()
     elif kernel_type == "spectral":
         lengthscale = params[0]
@@ -98,11 +113,13 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
         outputscale = params[2]
         gpytorch_kernel = SpectralMixtureKernel(num_mixtures=1, batch_shape=batch_shape)
         gpytorch_kernel.to(example_data.x1.device)
-        gpytorch_kernel.mixture_scales = torch.sqrt(
-            1 / (4 * torch.pi**2 * lengthscale[..., None, None, None] ** 2)
+        with_grads(
+            gpytorch_kernel,
+            "mixture_scales",
+            torch.sqrt(1 / (4 * torch.pi**2 * lengthscale[..., None, None, None] ** 2)),
         )
-        gpytorch_kernel.mixture_means = frequency[..., None, None, None]
-        gpytorch_kernel.mixture_weights = outputscale[..., None]
+        with_grads(gpytorch_kernel, "mixture_means", frequency[..., None, None, None])
+        with_grads(gpytorch_kernel, "mixture_weights", outputscale[..., None])
         kernel = gpytorch_kernel(example_data.x1[:, None], example_data.x2[:, None]).to_dense()
     elif kernel_type == "locally_periodic":
         lengthscale_rbf = params[0]
@@ -117,19 +134,40 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
             batch_shape=batch_shape,
         )
         gpytorch_kernel.to(example_data.x1.device)
-        gpytorch_kernel.outputscale = outputscale
-        gpytorch_kernel.base_kernel.kernels[0].lengthscale = lengthscale_rbf
-        gpytorch_kernel.base_kernel.kernels[1].lengthscale = lengthscale_periodic
-        gpytorch_kernel.base_kernel.kernels[1].period_length = period_length
+        with_grads(gpytorch_kernel, "outputscale", outputscale)
+        with_grads(
+            gpytorch_kernel.base_kernel.kernels[0], "lengthscale", lengthscale_rbf[:, None, None]
+        )
+        with_grads(
+            gpytorch_kernel.base_kernel.kernels[1],
+            "lengthscale",
+            lengthscale_periodic[:, None, None],
+        )
+        with_grads(
+            gpytorch_kernel.base_kernel.kernels[1], "period_length", period_length[:, None, None]
+        )
         kernel = gpytorch_kernel(example_data.x1[:, None], example_data.x2[:, None]).to_dense()
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
+    masked_kernel = torch.zeros_like(kernel)
     for i in range(example_data.start.shape[0]):
-        kernel[..., i * _BLOCK_SIZE : (i + 1) * _BLOCK_SIZE, : example_data.start[i]] = 0.0
-        kernel[..., i * _BLOCK_SIZE : (i + 1) * _BLOCK_SIZE, example_data.end[i] :] = 0.0
-    return kernel
+        rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
+        columns = slice(example_data.start[i], example_data.end[i])
+        masked_kernel[..., rows, columns] = kernel[..., rows, columns]
+    return masked_kernel
+
+
+@pytest.fixture(params=[True, False])
+def debug_build(request, monkeypatch: pytest.MonkeyPatch) -> bool:
+    debug = request.param
+    monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "true" if debug else "false")
+    return debug
 
 
 @pytest.fixture
-def debug_build(monkeypatch: pytest.MonkeyPatch) -> None:
-    monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "true")
+def kernel_define(example_data: ExampleData) -> str:
+    return {
+        "rbf": "KERNEL_RBF",
+        "spectral": "KERNEL_SPECTRAL",
+        "locally_periodic": "KERNEL_LOCALLY_PERIODIC",
+    }[example_data.kernel_type]

@@ -56,5 +56,15 @@
             "request": "attach",
             "processId": ""
         },
+        {
+            "name": "pytest (pure Python)",
+            "purpose": [
+                "debug-test"
+            ],
+            "type": "python",
+            "request": "launch",
+            "console": "integratedTerminal",
+            "justMyCode": false
+        }
     ]
 }
