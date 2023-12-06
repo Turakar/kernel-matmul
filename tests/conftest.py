@@ -34,6 +34,9 @@ class ExampleData:
         dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="rbf"),
         dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="spectral"),
         dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="locally_periodic"),
+        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="rbf"),
+        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="spectral"),
+        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="locally_periodic"),
     ]
 )
 def example_data(request) -> ExampleData:
