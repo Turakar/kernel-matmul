@@ -28,16 +28,21 @@ class ExampleData:
 
 @pytest.fixture(
     params=[
-        dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="rbf"),
-        dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="spectral"),
-        dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="locally_periodic"),
-        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="rbf"),
-        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="spectral"),
-        dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="locally_periodic"),
-        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="rbf"),
-        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="spectral"),
-        dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="locally_periodic"),
-    ]
+        pytest.param(param, id=f"example{i}")
+        for i, param in enumerate(
+            [
+                dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="rbf"),
+                dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="spectral"),
+                dict(m=128, n=128, b=1, k=1, cutoff=2.0, kernel_type="locally_periodic"),
+                dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="rbf"),
+                dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="spectral"),
+                dict(m=1000, n=1200, b=5, k=11, cutoff=2.0, kernel_type="locally_periodic"),
+                dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="rbf"),
+                dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="spectral"),
+                dict(m=401, n=301, b=10, k=11, cutoff=None, kernel_type="locally_periodic"),
+            ]
+        )
+    ],
 )
 def example_data(request) -> ExampleData:
     m = request.param["m"]
@@ -160,7 +165,7 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
     return masked_kernel
 
 
-@pytest.fixture(params=[True, False])
+@pytest.fixture(params=[True, False], ids=["debug", "release"])
 def debug_build(request, monkeypatch: pytest.MonkeyPatch) -> bool:
     debug = request.param
     monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "true" if debug else "false")

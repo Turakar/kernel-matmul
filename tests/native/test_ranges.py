@@ -6,7 +6,7 @@ from torch import Tensor
 from kernel_matmul import ranges
 
 
-@pytest.fixture(params=[-1.0, 0.0, 1.5])
+@pytest.fixture(params=[-1.0, 0.0, 1.5], ids=lambda x: f"offset={x}")
 def x_data(request) -> tuple[Tensor, Tensor]:
     offset = request.param
     x1 = torch.sort(torch.rand(100) * 10)[0]
@@ -14,7 +14,7 @@ def x_data(request) -> tuple[Tensor, Tensor]:
     return x1, x2
 
 
-@pytest.mark.parametrize("cutoff", [0.5, 1.0, 3.0])
+@pytest.mark.parametrize("cutoff", [0.5, 1.0, 3.0], ids=lambda x: f"cutoff={x}")
 def test_ranges_asymmetric(cutoff: float, x_data: tuple[Tensor, Tensor]) -> None:
     block_size = 3
     x1, x2 = x_data
@@ -44,7 +44,7 @@ def test_ranges_no_cutoff(x_data: tuple[Tensor, Tensor]) -> None:
     assert end.shape == (rows,)
 
 
-@pytest.mark.parametrize("cutoff", [0.5, 1.0, 3.0])
+@pytest.mark.parametrize("cutoff", [0.5, 1.0, 3.0], ids=lambda x: f"cutoff={x}")
 def test_ranges_symmetric(cutoff: float) -> None:
     x = torch.sort(torch.rand(100) * 10)[0]
     block_size = 3
