@@ -27,3 +27,8 @@ pytest-repeat = "^0.9.3"
 [tool.ruff]
 line-length = 100
 extend-include = ["*.ipynb"]
+
+[tool.pytest.ini_options]
+markers = [
+    "square: mark test to run only on square kernel matrices",
+]

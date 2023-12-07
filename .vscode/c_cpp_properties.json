@@ -13,7 +13,8 @@
                 "KM_MATMUL_THREADS=64",
                 "KM_MATMUL_PER_THREAD=2",
                 "KM_BILINEAR_DERIVATIVE_THREAD_DIM=16",
-                "KM_BILINEAR_DERIVATIVE_PER_THREAD=8"
+                "KM_BILINEAR_DERIVATIVE_PER_THREAD=8",
+                "KM_DENSE_THREAD_DIM=64"
             ],
             "intelliSenseMode": "linux-gcc-x64",
             "cStandard": "c17",

@@ -44,9 +44,10 @@ class ExampleData:
         )
     ],
 )
-def example_data(request) -> ExampleData:
+def example_data(request: pytest.FixtureRequest) -> ExampleData:
+    square = request.node.get_closest_marker("square", False)
     m = request.param["m"]
-    n = request.param["n"]
+    n = request.param["n"] if not square else m
     b = request.param["b"]
     k = request.param["k"]
     cutoff = request.param["cutoff"]
