@@ -1,9 +1,16 @@
 import math
 import os
+import warnings
 import torch
 from torch import Tensor
 
 from kernel_matmul import _BLOCK_SIZE
+
+with warnings.catch_warnings():
+    warnings.filterwarnings(
+        "ignore", category=DeprecationWarning, message="pkg_resources is deprecated as an API"
+    )
+    import torch.utils.cpp_extension
 
 
 def _load_native():

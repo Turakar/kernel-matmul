@@ -1,12 +1,13 @@
 import torch
 from torch import Tensor
-from kernel_matmul import _BLOCK_SIZE, load_native
+from kernel_matmul.compile import load_native
+from kernel_matmul.configurations import BilinearDerivativeConfiguration
 
 from tests.conftest import ExampleData
 
 
 def test_bilinear_derivative(
-    example_data: ExampleData, reference_kernel: Tensor, kernel_define: str, debug_build: bool
+    example_data: ExampleData, reference_kernel: Tensor, kernel_define: str, build_type: bool
 ) -> None:
     x1 = example_data.x1
     x2 = example_data.x2
@@ -19,6 +20,16 @@ def test_bilinear_derivative(
     right_vectors = torch.randn(x2.shape[0], 5, device=x1.device)
     right_vectors = right_vectors / torch.linalg.norm(right_vectors)
 
+    args = (
+        x1,
+        x2,
+        left_vectors,
+        right_vectors,
+        params,
+        start,
+        end,
+    )
+
     (
         left_vectors.T[:, None, :]  # d x 1 x m
         @ reference_kernel.sum(dim=0, keepdim=True)  # 1 x m x n
@@ -26,24 +37,14 @@ def test_bilinear_derivative(
     ).sum().backward()
     reference_grads = params.grad.clone()
 
+    config = BilinearDerivativeConfiguration(example_data.kernel_type)
+    defines = config.make_config(args)
+
     with torch.no_grad():
         native = load_native(
             name="bilinear_derivative",
-            defines={
-                "BLOCK_SIZE": _BLOCK_SIZE,
-                "BILINEAR_DERIVATIVE_THREAD_DIM": 16,
-                "BILINEAR_DERIVATIVE_PER_THREAD": 8,
-                kernel_define: None,
-            },
+            defines=defines,
         )
-        result = native.call(
-            x1,
-            x2,
-            left_vectors,
-            right_vectors,
-            params,
-            start,
-            end,
-        )
+        result = native.call(*args)
 
     assert torch.allclose(reference_grads, result, atol=2e-3, rtol=2e-3)

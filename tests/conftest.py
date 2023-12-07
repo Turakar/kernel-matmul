@@ -13,6 +13,7 @@ from gpytorch.kernels import (
 
 from kernel_matmul.ranges import make_ranges
 from kernel_matmul import _BLOCK_SIZE
+from kernel_matmul.configurations import get_kernel_type_define
 
 
 @dataclass
@@ -167,16 +168,17 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
 
 
 @pytest.fixture(params=[True, False], ids=["debug", "release"])
-def debug_build(request, monkeypatch: pytest.MonkeyPatch) -> bool:
+def build_type(request, monkeypatch: pytest.MonkeyPatch) -> bool:
     debug = request.param
     monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "true" if debug else "false")
     return debug
 
 
 @pytest.fixture
+def release_build(monkeypatch: pytest.MonkeyPatch) -> None:
+    monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "false")
+
+
+@pytest.fixture
 def kernel_define(example_data: ExampleData) -> str:
-    return {
-        "rbf": "KERNEL_RBF",
-        "spectral": "KERNEL_SPECTRAL",
-        "locally_periodic": "KERNEL_LOCALLY_PERIODIC",
-    }[example_data.kernel_type]
+    return get_kernel_type_define(example_data.kernel_type)
