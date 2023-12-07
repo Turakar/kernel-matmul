@@ -24,7 +24,7 @@ std::array<torch::Tensor, 2> make_ranges(const torch::Tensor x1_any, const torch
             j = start[i - 1].item<int>();
         }
         for (; j < x2.size(0); j++) {
-            const auto tau = x1[i * block_size].item<float>() - x2[j].item<float>();
+            const auto tau = x1[row_first].item<float>() - x2[j].item<float>();
             if (tau <= cutoff) {
                 break;
             }
