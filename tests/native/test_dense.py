@@ -1,58 +1,34 @@
-import pytest
-from kernel_matmul.compile import load_native
-from torch import Tensor
-from kernel_matmul.configurations import DenseConfiguration
-from tests.conftest import ExampleData
 import torch
+from torch import Tensor
+from kernel_matmul.compile import load_native
+from kernel_matmul.configurations import DenseConfiguration
+
+from tests.conftest import ExampleData
 
 
-@pytest.mark.square(True)
-def test_diagonal(
-    example_data: ExampleData, reference_kernel: Tensor, kernel_define: str, build_type: bool
-) -> None:
+def test_dense(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
+    x1 = example_data.x1
+    x2 = example_data.x2
+    params = example_data.params
+    start = example_data.start
+    end = example_data.end
+
     args = (
-        example_data.x1,
-        example_data.x2,
-        -1,
-        example_data.params,
-        example_data.start,
-        example_data.end,
+        x1,
+        x2,
+        params,
+        start,
+        end,
     )
+
     config = DenseConfiguration(example_data.kernel_type)
     defines = config.make_config(args)
-    native = load_native(
-        name="dense",
-        defines=defines,
-    )
-    result = native.call(*args)
-    reference = reference_kernel.diagonal(dim1=-2, dim2=-1)
-    assert torch.allclose(reference, result, atol=2e-4, rtol=2e-4)
 
+    with torch.no_grad():
+        native = load_native(
+            name="dense",
+            defines=defines,
+        )
+        result = native.call(*args)
 
-@pytest.mark.parametrize("row", [0, 133, 256])
-def test_row(
-    example_data: ExampleData,
-    reference_kernel: Tensor,
-    kernel_define: str,
-    build_type: bool,
-    row: int,
-) -> None:
-    if row >= example_data.x1.shape[0]:
-        pytest.skip("Row index out of bounds")
-    args = (
-        example_data.x1,
-        example_data.x2,
-        row,
-        example_data.params,
-        example_data.start,
-        example_data.end,
-    )
-    config = DenseConfiguration(example_data.kernel_type)
-    defines = config.make_config(args)
-    native = load_native(
-        name="dense",
-        defines=defines,
-    )
-    result = native.call(*args)
-    reference = reference_kernel[:, row, :]
-    assert torch.allclose(reference, result, atol=2e-4, rtol=2e-4)
+    assert torch.allclose(reference_kernel, result, atol=2e-4, rtol=2e-4)

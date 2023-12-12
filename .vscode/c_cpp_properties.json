@@ -14,9 +14,10 @@
                 "KM_MATMUL_PER_THREAD=2",
                 "KM_BILINEAR_DERIVATIVE_THREAD_DIM=16",
                 "KM_BILINEAR_DERIVATIVE_PER_THREAD=8",
-                "KM_DENSE_THREAD_DIM=64",
+                "KM_ROW_THREAD_DIM=64",
                 "KM_MATMUL_BWD_THREAD_DIM=16",
                 "KM_MATMUL_BWD_PER_THREAD=8",
+                "KM_DENSE_THREAD_DIM=64"
             ],
             "intelliSenseMode": "linux-gcc-x64",
             "cStandard": "c17",

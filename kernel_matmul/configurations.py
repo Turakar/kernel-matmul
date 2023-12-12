@@ -82,6 +82,21 @@ class BilinearDerivativeConfiguration(SingleConfiguration):
         return ""
 
 
+class RowConfiguration(SingleConfiguration):
+    def __init__(self, kernel_type: str):
+        self.kernel_type = kernel_type
+
+    def make_config(self, args: tuple) -> Defines:
+        return {
+            "BLOCK_SIZE": _BLOCK_SIZE,
+            get_kernel_type_define(self.kernel_type): None,
+            "ROW_THREAD_DIM": 64,
+        }
+
+    def cache_key(self, args: tuple) -> str:
+        return ""
+
+
 class DenseConfiguration(SingleConfiguration):
     def __init__(self, kernel_type: str):
         self.kernel_type = kernel_type
@@ -90,7 +105,7 @@ class DenseConfiguration(SingleConfiguration):
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
             get_kernel_type_define(self.kernel_type): None,
-            "DENSE_THREAD_DIM": 64,
+            "DENSE_THREAD_DIM": 16,
         }
 
     def cache_key(self, args: tuple) -> str:
