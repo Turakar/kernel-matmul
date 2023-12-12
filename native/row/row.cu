@@ -51,8 +51,8 @@ __global__ void kernel_row_cuda_kernel(
     }
 }
 
-torch::Tensor kernel_row_cuda_kernel(torch::Tensor x1, torch::Tensor x2, int type,
-                                     torch::Tensor params, torch::Tensor start, torch::Tensor end) {
+torch::Tensor kernel_row_cuda(torch::Tensor x1, torch::Tensor x2, int type, torch::Tensor params,
+                              torch::Tensor start, torch::Tensor end) {
     const int block_size = KM_BLOCK_SIZE;
     const int thread_dim = KM_ROW_THREAD_DIM;
     const int b = params.size(1);
