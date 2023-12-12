@@ -1,5 +1,6 @@
 #include "../common/gpu_assert.cuh"
 #include "../common/kernel_function.cuh"
+#include "../common/utils.h"
 #include "bilinear_derivative.h"
 
 #include <torch/extension.h>
@@ -130,7 +131,7 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     const int per_thread = KM_BILINEAR_DERIVATIVE_PER_THREAD;
 
     const dim3 threads{thread_dim, thread_dim, 1};
-    const dim3 blocks{(x1.size(0) + block_size - 1) / block_size, params.size(1), 1};
+    const dim3 blocks{KM_CEIL_DIV(x1.size(0), block_size), params.size(1), 1};
 
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());

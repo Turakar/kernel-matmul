@@ -7,7 +7,7 @@ from tests.conftest import ExampleData
 
 
 def test_bilinear_derivative(
-    example_data: ExampleData, reference_kernel: Tensor, kernel_define: str, build_type: bool
+    example_data: ExampleData, reference_kernel: Tensor, build_type: bool
 ) -> None:
     x1 = example_data.x1
     x2 = example_data.x2

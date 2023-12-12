@@ -25,6 +25,7 @@ class ExampleData:
     start: Tensor
     end: Tensor
     kernel_type: str
+    cutoff: float | None
 
 
 @pytest.fixture(
@@ -59,6 +60,7 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
     x2 = torch.sort(torch.rand(n, device=device, dtype=torch.float32) * 10)[0]
     rhs = torch.randn(n, k, device=device, dtype=torch.float32)
     rhs = rhs / torch.linalg.norm(rhs, dim=0, keepdim=True)
+    rhs = rhs.unsqueeze(0).expand(b, -1, -1)
 
     start, end = make_ranges(cutoff, x1, x2)
 
@@ -84,7 +86,7 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
 
     params.requires_grad = True
 
-    return ExampleData(
+    data = ExampleData(
         x1=x1,
         x2=x2,
         rhs=rhs,
@@ -92,11 +94,15 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
         start=start,
         end=end,
         kernel_type=kernel_type,
+        cutoff=cutoff,
     )
+    if request.cls is not None:
+        request.cls.example_data = data
+    return data
 
 
 @pytest.fixture
-def reference_kernel(example_data: ExampleData) -> Tensor:
+def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) -> Tensor:
     def with_grads(kernel: Kernel, name: str, value: Tensor) -> None:
         raw_name = f"raw_{name}"
         constraint = kernel.constraint_for_parameter_name(raw_name)
@@ -164,6 +170,10 @@ def reference_kernel(example_data: ExampleData) -> Tensor:
         rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
         columns = slice(example_data.start[i], example_data.end[i])
         masked_kernel[..., rows, columns] = kernel[..., rows, columns]
+
+    if request.cls is not None:
+        request.cls.reference_kernel = masked_kernel
+
     return masked_kernel
 
 

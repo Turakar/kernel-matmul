@@ -5,11 +5,11 @@
 
 torch::Tensor kernel_dense(torch::Tensor x1, torch::Tensor x2, int type, torch::Tensor params,
                            torch::Tensor start, torch::Tensor end) {
-    CHECK_INPUT(x1);
-    CHECK_INPUT(x2);
-    CHECK_INPUT(params);
-    CHECK_INPUT_INT32(start);
-    CHECK_INPUT_INT32(end);
+    check_cuda(x1);
+    check_cuda(x2);
+    check_cuda(params);
+    check_cuda_int32(start);
+    check_cuda_int32(end);
     if (type < -1 || type >= x1.size(0)) {
         throw std::invalid_argument("type must be a row index or -1");
     }
