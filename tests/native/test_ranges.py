@@ -42,6 +42,17 @@ def test_ranges_no_cutoff(x_data: tuple[Tensor, Tensor]) -> None:
     assert end.shape == (rows,)
 
 
+def test_ranges_no_cutoff_symmetric() -> None:
+    x = torch.sort(torch.rand(100) * 10)[0]
+    block_size = 3
+    start, end = ranges.make_ranges(None, x, block_size=block_size)
+    rows = int(math.ceil(x.shape[0] / block_size))
+    assert torch.all(start == 0)
+    assert torch.all(end == x.shape[0])
+    assert start.shape == (rows,)
+    assert end.shape == (rows,)
+
+
 @pytest.mark.parametrize("cutoff", [0.1, 1.0, 11.0], ids=lambda x: f"cutoff_{x}")
 def test_ranges_symmetric(cutoff: float) -> None:
     x = torch.sort(torch.rand(100) * 10)[0]

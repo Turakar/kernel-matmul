@@ -40,7 +40,12 @@ def make_ranges(
     if cutoff is None:
         rows = int(math.ceil(x1.shape[0] / block_size))
         start = torch.zeros(rows, dtype=torch.int32, device=x1.device)
-        end = torch.full((rows,), x2.shape[0], dtype=torch.int32, device=x2.device)
+        end = torch.full(
+            (rows,),
+            x2.shape[0] if x2 is not None else x1.shape[0],
+            dtype=torch.int32,
+            device=x1.device,
+        )
         return start, end
     if x2 is None:
         return _native.make_ranges_symmetric(x1, cutoff, block_size)
