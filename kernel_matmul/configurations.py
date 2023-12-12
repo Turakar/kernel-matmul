@@ -30,7 +30,7 @@ class MatmulSingleConfiguration(SingleConfiguration):
         x1, x2, rhs, params, start, end = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
-            "MATMUL_K_BLOCK_SIZE": rhs.shape[-1],
+            "MATMUL_K_BLOCK_SIZE": min(rhs.shape[-1], 32),
             get_kernel_type_define(self.kernel_type): None,
             "MATMUL_THREADS": 64,
             "MATMUL_PER_THREAD": 2,
@@ -91,6 +91,22 @@ class DenseConfiguration(SingleConfiguration):
             "BLOCK_SIZE": _BLOCK_SIZE,
             get_kernel_type_define(self.kernel_type): None,
             "DENSE_THREAD_DIM": 64,
+        }
+
+    def cache_key(self, args: tuple) -> str:
+        return ""
+
+
+class MatmulBwdConfiguration(SingleConfiguration):
+    def __init__(self, kernel_type: str):
+        self.kernel_type = kernel_type
+
+    def make_config(self, args: tuple) -> Defines:
+        return {
+            "BLOCK_SIZE": _BLOCK_SIZE,
+            get_kernel_type_define(self.kernel_type): None,
+            "MATMUL_BWD_THREAD_DIM": 16,
+            "MATMUL_BWD_PER_THREAD": 8,
         }
 
     def cache_key(self, args: tuple) -> str:
