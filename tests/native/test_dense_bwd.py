@@ -1,15 +1,14 @@
 import torch
 from torch import Tensor
 from kernel_matmul.compile import load_native
-from kernel_matmul.configurations import MatmulBwdConfiguration
+from kernel_matmul.configurations import DenseBwdConfiguration
 
 from tests.conftest import ExampleData
 
 
-def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
+def test_dense_bwd(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
     x1 = example_data.x1
     x2 = example_data.x2
-    rhs = example_data.rhs
     params = example_data.params
     start = example_data.start
     end = example_data.end
@@ -18,7 +17,7 @@ def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_t
         params.shape[0],
         params.shape[1],
         x1.shape[-1],
-        rhs.shape[-1],
+        x2.shape[-1],
         device=x1.device,
         dtype=x1.dtype,
     )
@@ -27,22 +26,21 @@ def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_t
     args = (
         x1,
         x2,
-        rhs,
         params,
         start,
         end,
         out_grad,
     )
 
-    (reference_kernel @ rhs).backward(gradient=out_grad)
+    reference_kernel.backward(gradient=out_grad)
     reference_grads = params.grad.clone()
 
-    config = MatmulBwdConfiguration(example_data.kernel_type)
+    config = DenseBwdConfiguration(example_data.kernel_type)
     defines = config.make_config(args)
 
     with torch.no_grad():
         native = load_native(
-            name="matmul_bwd",
+            name="dense_bwd",
             defines=defines,
         )
         result = native.call(*args)
