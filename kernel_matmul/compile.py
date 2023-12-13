@@ -21,7 +21,7 @@ def load_native(
 ) -> None:
     # Get compile options from environment variables
     debug = os.environ.get("KERNEL_MATMUL_COMPILE_DEBUG", "false") == "true"
-    print_sizes = os.environ.get("KERNEL_MATMUL_COMPILE_PRINT_SIZES", "false") == "true"
+    print_sizes = os.environ.get("KERNEL_MATMUL_COMPILE_PRINT_SIZE", "false") == "true"
     verbose = os.environ.get("KERNEL_MATMUL_COMPILE_VERBOSE", "false") == "true"
 
     # Default values
@@ -69,8 +69,8 @@ def load_native(
     else:
         cpp_flags.append("-O3")
     if print_sizes:
-        flags.append("-DKM_DEBUG_PRINT_SIZES")
-        torch_name += "___print_sizes"
+        flags.append("-DKM_DEBUG_PRINT_SIZE")
+        torch_name += "___print_size"
 
     # Compile and load
     return torch.utils.cpp_extension.load(

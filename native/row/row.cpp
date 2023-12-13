@@ -10,7 +10,7 @@ torch::Tensor kernel_row(torch::Tensor x1, torch::Tensor x2, int type, torch::Te
     check_cuda(params);
     check_cuda_int32(start);
     check_cuda_int32(end);
-    if (type < -2 || type >= x1.size(0)) {
+    if (type < -2 || type >= x1.size(1)) {
         throw std::invalid_argument("type must be a row index or -1 (diagonal)");
     }
     auto out = kernel_row_cuda(x1, x2, type, params, start, end);

@@ -38,11 +38,11 @@ def make_ranges(
     cutoff: float | None, x1: Tensor, x2: Tensor | None = None, *, block_size: int = _BLOCK_SIZE
 ) -> tuple[Tensor, Tensor]:
     if cutoff is None:
-        rows = int(math.ceil(x1.shape[0] / block_size))
-        start = torch.zeros(rows, dtype=torch.int32, device=x1.device)
+        rows = int(math.ceil(x1.shape[1] / block_size))
+        start = torch.zeros(x1.shape[0], rows, dtype=torch.int32, device=x1.device)
         end = torch.full(
-            (rows,),
-            x2.shape[0] if x2 is not None else x1.shape[0],
+            (x1.shape[0], rows),
+            x2.shape[1] if x2 is not None else x1.shape[1],
             dtype=torch.int32,
             device=x1.device,
         )

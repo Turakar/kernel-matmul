@@ -9,14 +9,14 @@
 #include <cuda_runtime.h>
 
 __global__ void kernel_matmul_cuda_kernel_bwd(
-    const torch::PackedTensorAccessor32<float, 1, torch::RestrictPtrTraits> x1,
-    const torch::PackedTensorAccessor32<float, 1, torch::RestrictPtrTraits> x2,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> rhs,
+    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
+    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
+    const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> rhs,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> start,
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> end,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> out_grad,
-    torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> params_grad) {
+    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
+    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
+    const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> out_grad,
+    torch::PackedTensorAccessor32<float, 5, torch::RestrictPtrTraits> params_grad) {
     // This is almost the same as the forward pass, as we have the same matmul structure in the
     // derivative. The main difference is that we can now accumulate the gradients to smaller
     // portions directly, saving registers. For this, we need the output gradient, which we will
@@ -34,9 +34,10 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
                   "Thread block must be evenly divisible in warps.");
     const int k_base = blockIdx.x * block_size;
     const int m_base = blockIdx.y * block_size;
-    const int b = blockIdx.z;
-    const int k_size = rhs.size(2);
-    const int m_size = x1.size(0);
+    const int b = blockIdx.z % params.size(1);
+    const int batch = blockIdx.z / params.size(1);
+    const int k_size = rhs.size(3);
+    const int m_size = x1.size(1);
 
     // This is an alternative indexing that is used for loading from global to shared memory to
     // avoid bank conflicts.
@@ -66,7 +67,7 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
             const auto m_index = m_base + m * thread_dim + threadIdx.y;
             const auto k_index = k_base + k * thread_dim + threadIdx.x;
             if (m_index < m_size && k_index < k_size) {
-                reg_out_grad[m][k] = out_grad[b][m_index][k_index];
+                reg_out_grad[m][k] = out_grad[batch][b][m_index][k_index];
             } else {
                 reg_out_grad[m][k] = 0;
             }
@@ -79,8 +80,8 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
     for (int i = 0; i < num_params; i++) {
         reg_params[i] = params[i][b];
     }
-    const int start_m = start[blockIdx.y];
-    const int end_m = end[blockIdx.y];
+    const int start_m = start[batch][blockIdx.y];
+    const int end_m = end[batch][blockIdx.y];
 
     // Initialize accumulator for output
     // Each thread accumulates outputs for the entries
@@ -106,12 +107,12 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
                 const auto k = k_base + i;
                 const auto m = m_base + i;
                 if (k < k_size && n < end_m) {
-                    shm_rhs[shm_index] = rhs[b][n][k];
+                    shm_rhs[shm_index] = rhs[batch][b][n][k];
                 } else {
                     shm_rhs[shm_index] = 0;
                 }
                 if (m < m_size && n < end_m) {
-                    const auto grads = kernel_function_bwd(x1[m], x2[n], reg_params);
+                    const auto grads = kernel_function_bwd(x1[batch][m], x2[batch][n], reg_params);
 #pragma unroll
                     for (int p = 0; p < num_params; p++) {
                         shm_params_grad[p * buffer_size + shm_index] = grads[p];
@@ -159,10 +160,10 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
     // Write output to global memory
     const auto m = blockIdx.y * thread_dim + threadIdx.y;
     const auto k = blockIdx.x * thread_dim + threadIdx.x;
-    if (m < params_grad.size(2) && k < params_grad.size(3)) {
+    if (m < params_grad.size(3) && k < params_grad.size(4)) {
 #pragma unroll
         for (int p = 0; p < num_params; p++) {
-            params_grad[p][b][m][k] = accumulator[p];
+            params_grad[p][b][batch][m][k] = accumulator[p];
         }
     }
 }
@@ -174,14 +175,17 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
     const int thread_dim = KM_MATMUL_BWD_THREAD_DIM;
     const int per_thread = KM_MATMUL_BWD_PER_THREAD;
     const int num_params = KM_NUM_PARAMS;
+    const int batch = x1.size(0);
+    const int b = params.size(1);
 
     const dim3 threads{thread_dim, thread_dim, 1};
-    const dim3 blocks{KM_CEIL_DIV(rhs.size(2), block_size), KM_CEIL_DIV(x1.size(0), block_size),
-                      params.size(1)};
+    const dim3 blocks{KM_CEIL_DIV(rhs.size(3), block_size), KM_CEIL_DIV(x1.size(1), block_size),
+                      b * batch};
     const auto shared = (int)(rhs.element_size() * (1 + num_params) * block_size * thread_dim);
 
 #ifdef PRINT_SIZE
-    printf("m, n, k, b: (%d, %d, %d, %d)\n", x1.size(0), x2.size(0), rhs.size(2), params.size(1));
+    printf("m, n, k, b, batch: (%d, %d, %d, %d, %d)\n", x1.size(1), x2.size(1), rhs.size(3), b,
+           batch);
     printf("threads: (%d, %d, %d)\n", threads.x, threads.y, threads.z);
     printf("blocks: (%d, %d, %d)\n", blocks.x, blocks.y, blocks.z);
     printf("shared: %dK\n", KM_CEIL_DIV(shared, 1024)));
@@ -189,21 +193,20 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
 
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());
-    const auto out_shape =
-        torch::IntArrayRef({num_params, params.size(1), x1.size(0), rhs.size(2)});
+    const auto out_shape = torch::IntArrayRef({num_params, b, batch, x1.size(1), rhs.size(3)});
     auto params_grad = torch::zeros(out_shape, out_opts);
 
     kernel_matmul_cuda_kernel_bwd<<<blocks, threads, shared>>>(
-        x1.packed_accessor32<float, 1, torch::RestrictPtrTraits>(),
-        x2.packed_accessor32<float, 1, torch::RestrictPtrTraits>(),
-        rhs.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
+        x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        rhs.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
         params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
-        start.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-        end.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-        out_grad.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
-        params_grad.packed_accessor32<float, 4, torch::RestrictPtrTraits>());
+        start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
+        end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
+        out_grad.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
+        params_grad.packed_accessor32<float, 5, torch::RestrictPtrTraits>());
 
     KM_DO_GPU_ASSERT;
 
-    return params_grad.sum({2, 3});
+    return params_grad.sum({2, 3, 4});
 }

@@ -17,9 +17,9 @@ def test_matmul_bwd(
     end = example_data.end
 
     out_grad = torch.randn(
-        params.shape[1], x1.shape[-1], rhs.shape[-1], device=x1.device, dtype=x1.dtype
+        x1.shape[0], params.shape[1], x1.shape[-1], rhs.shape[-1], device=x1.device, dtype=x1.dtype
     )
-    out_grad = out_grad / torch.linalg.norm(out_grad, dim=1, keepdim=True)
+    out_grad = out_grad / torch.linalg.norm(out_grad, dim=(-2, -1), keepdim=True)
 
     args = (
         x1,

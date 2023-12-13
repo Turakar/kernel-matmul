@@ -9,19 +9,20 @@
 #include <cuda_runtime.h>
 
 __global__ void kernel_matmul_vector_cuda_kernel(
-    const torch::PackedTensorAccessor32<float, 1, torch::RestrictPtrTraits> x1,
-    const torch::PackedTensorAccessor32<float, 1, torch::RestrictPtrTraits> x2,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> rhs,
+    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
+    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
+    const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> rhs,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> start,
-    const torch::PackedTensorAccessor32<int, 1, torch::RestrictPtrTraits> end,
-    torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> out) {
+    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
+    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
+    torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> out) {
     // Index calculations
-    const auto b = blockIdx.z;
+    const auto b = blockIdx.z % params.size(1);
+    const auto batch = blockIdx.z / params.size(1);
     const auto m_base = blockIdx.x * KM_BLOCK_SIZE + threadIdx.x;
-    const auto m_size = x1.size(0);
+    const auto m_size = x1.size(1);
     const auto k_base = blockIdx.y * KM_MATMUL_K_BLOCK_SIZE;
-    const auto k_size = rhs.size(2);
+    const auto k_size = rhs.size(3);
 
     // Load parameters to registers
     std::array<float, KM_NUM_PARAMS> reg_params;
@@ -37,7 +38,7 @@ __global__ void kernel_matmul_vector_cuda_kernel(
     for (int i = 0; i < KM_MATMUL_PER_THREAD; i++) {
         const auto m = m_base + i * KM_MATMUL_THREADS;
         if (m < m_size) {
-            reg_x1[i] = x1[m];
+            reg_x1[i] = x1[batch][m];
         } else {
             reg_x1[i] = 0;
         }
@@ -48,15 +49,15 @@ __global__ void kernel_matmul_vector_cuda_kernel(
     __shared__ std::array<std::array<float, KM_MATMUL_K_BLOCK_SIZE>, KM_BLOCK_SIZE> shm_rhs;
 
     // Outer loop advances blocks along columns of the kernel matrix and rows of the rhs
-    const int start_m = start[blockIdx.x];
-    const int end_m = end[blockIdx.x];
+    const int start_m = start[batch][blockIdx.x];
+    const int end_m = end[batch][blockIdx.x];
     for (int n_base = start_m; n_base < end_m; n_base += KM_BLOCK_SIZE) {
 
         // Load x2
         for (int i = threadIdx.x; i < KM_BLOCK_SIZE; i += KM_MATMUL_THREADS) {
             const auto n = n_base + i;
             if (n < end_m) {
-                shm_x2[i] = x2[n];
+                shm_x2[i] = x2[batch][n];
             } else {
                 shm_x2[i] = 0;
             }
@@ -69,7 +70,7 @@ __global__ void kernel_matmul_vector_cuda_kernel(
             const auto n_global = n_base + n;
             const auto k = i % KM_MATMUL_K_BLOCK_SIZE;
             if (n_global < end_m && k_base + k < k_size) {
-                shm_rhs[n][k] = rhs[b][n_global][k_base + k];
+                shm_rhs[n][k] = rhs[batch][b][n_global][k_base + k];
             } else {
                 shm_rhs[n][k] = 0;
             }
@@ -99,7 +100,7 @@ __global__ void kernel_matmul_vector_cuda_kernel(
         const auto m_global = m_base + m * KM_MATMUL_THREADS;
         for (int k = 0; k < KM_MATMUL_K_BLOCK_SIZE; k++) {
             if (m_global < m_size && k < k_size) {
-                out[b][m_global][k_base + k] = accumulator[m][k];
+                out[batch][b][m_global][k_base + k] = accumulator[m][k];
             }
         }
     }
@@ -114,27 +115,27 @@ torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tens
 
     const dim3 threads{KM_MATMUL_THREADS, 1, 1};
     const dim3 blocks{
-        KM_CEIL_DIV(x1.size(0), KM_BLOCK_SIZE),
-        KM_CEIL_DIV(rhs.size(2), KM_MATMUL_K_BLOCK_SIZE),
-        params.size(1),
+        KM_CEIL_DIV(x1.size(1), KM_BLOCK_SIZE),
+        KM_CEIL_DIV(rhs.size(3), KM_MATMUL_K_BLOCK_SIZE),
+        params.size(1) * x1.size(0),
     };
 
 #ifdef KM_DEBUG_PRINT_SIZE
-    printf("m, n, b, k: (%d, %d, %d, %d)\n", x1.size(0), x2.size(0), params.size(1), rhs.size(2));
+    printf("m, n, b, k: (%d, %d, %d, %d)\n", x1.size(1), x2.size(1), params.size(1), rhs.size(3));
     printf("threads: (%d, %d, %d)\n", threads.x, threads.y, threads.z);
     printf("blocks: (%d, %d, %d)\n", blocks.x, blocks.y, blocks.z);
 #endif
 
-    out = torch::zeros({params.size(1), x1.size(0), rhs.size(2)}, out_opts);
+    out = torch::zeros({x1.size(0), params.size(1), x1.size(1), rhs.size(3)}, out_opts);
 
     kernel_matmul_vector_cuda_kernel<<<blocks, threads>>>(
-        x1.packed_accessor32<float, 1, torch::RestrictPtrTraits>(),
-        x2.packed_accessor32<float, 1, torch::RestrictPtrTraits>(),
-        rhs.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
+        x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        rhs.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
         params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
-        start.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-        end.packed_accessor32<int, 1, torch::RestrictPtrTraits>(),
-        out.packed_accessor32<float, 3, torch::RestrictPtrTraits>());
+        start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
+        end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
+        out.packed_accessor32<float, 4, torch::RestrictPtrTraits>());
 
     KM_DO_GPU_ASSERT;
 

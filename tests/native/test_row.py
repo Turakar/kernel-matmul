@@ -7,9 +7,7 @@ import torch
 
 
 @pytest.mark.square(True)
-def test_diagonal(
-    example_data: ExampleData, reference_kernel: Tensor, kernel_define: str, build_type: bool
-) -> None:
+def test_diagonal(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
     args = (
         example_data.x1,
         example_data.x2,
@@ -33,11 +31,10 @@ def test_diagonal(
 def test_row(
     example_data: ExampleData,
     reference_kernel: Tensor,
-    kernel_define: str,
     build_type: bool,
     row: int,
 ) -> None:
-    if row >= example_data.x1.shape[0]:
+    if row >= example_data.x1.shape[1]:
         pytest.skip("Row index out of bounds")
     args = (
         example_data.x1,
@@ -54,5 +51,5 @@ def test_row(
         defines=defines,
     )
     result = native.call(*args)
-    reference = reference_kernel[:, row, :]
+    reference = reference_kernel[:, :, row, :]
     assert torch.allclose(reference, result, atol=2e-4, rtol=2e-4)
