@@ -12,7 +12,7 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
     const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> rhs,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
+    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
     const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> out_grad,
@@ -78,7 +78,7 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
     std::array<float, num_params> reg_params;
 #pragma unroll
     for (int i = 0; i < num_params; i++) {
-        reg_params[i] = params[i][b];
+        reg_params[i] = params[batch][b][i];
     }
     const int start_m = start[batch][blockIdx.y];
     const int end_m = end[batch][blockIdx.y];
@@ -163,7 +163,7 @@ __global__ void kernel_matmul_cuda_kernel_bwd(
     if (m < params_grad.size(3) && k < params_grad.size(4)) {
 #pragma unroll
         for (int p = 0; p < num_params; p++) {
-            params_grad[p][b][batch][m][k] = accumulator[p];
+            params_grad[batch][b][p][m][k] = accumulator[p];
         }
     }
 }
@@ -175,7 +175,7 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
     const int thread_dim = KM_MATMUL_BWD_THREAD_DIM;
     const int per_thread = KM_MATMUL_BWD_PER_THREAD;
     const int num_params = KM_NUM_PARAMS;
-    const int batch = x1.size(0);
+    const int batch = params.size(0);
     const int b = params.size(1);
 
     const dim3 threads{thread_dim, thread_dim, 1};
@@ -193,14 +193,14 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
 
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());
-    const auto out_shape = torch::IntArrayRef({num_params, b, batch, x1.size(1), rhs.size(3)});
+    const auto out_shape = torch::IntArrayRef({batch, b, num_params, x1.size(1), rhs.size(3)});
     auto params_grad = torch::zeros(out_shape, out_opts);
 
     kernel_matmul_cuda_kernel_bwd<<<blocks, threads, shared>>>(
         x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         rhs.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
-        params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         out_grad.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
@@ -208,5 +208,5 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
 
     KM_DO_GPU_ASSERT;
 
-    return params_grad.sum({2, 3, 4});
+    return params_grad.sum({3, 4});
 }

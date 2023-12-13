@@ -14,6 +14,7 @@ from gpytorch.kernels import (
 from kernel_matmul.ranges import make_ranges
 from kernel_matmul import _BLOCK_SIZE
 from kernel_matmul.configurations import get_kernel_type_define
+from kernel_matmul.util import dict_product
 
 
 @dataclass
@@ -32,17 +33,19 @@ class ExampleData:
     params=[
         pytest.param(param, id=f"example{i}")
         for i, param in enumerate(
-            [
-                dict(m=128, n=128, b=1, k=1, batch=1, cutoff=2.0, kernel_type="rbf"),
-                dict(m=128, n=128, b=1, k=1, batch=1, cutoff=2.0, kernel_type="spectral"),
-                dict(m=128, n=128, b=1, k=1, batch=1, cutoff=2.0, kernel_type="locally_periodic"),
-                dict(m=600, n=800, b=3, k=11, batch=2, cutoff=2.0, kernel_type="rbf"),
-                dict(m=600, n=800, b=3, k=11, batch=2, cutoff=2.0, kernel_type="spectral"),
-                dict(m=600, n=800, b=3, k=11, batch=2, cutoff=2.0, kernel_type="locally_periodic"),
-                dict(m=301, n=201, b=4, k=11, batch=3, cutoff=None, kernel_type="rbf"),
-                dict(m=301, n=201, b=4, k=11, batch=3, cutoff=None, kernel_type="spectral"),
-                dict(m=301, n=201, b=4, k=11, batch=3, cutoff=None, kernel_type="locally_periodic"),
-            ]
+            dict_product(
+                [
+                    dict(m=128, n=128, b=1, batch=1, k=1, cutoff=2.0),
+                    dict(m=600, n=800, b=3, batch=1, k=11, cutoff=2.0),
+                    dict(m=500, n=500, b=1, batch=3, k=11, cutoff=2.0),
+                    dict(m=301, n=201, b=4, batch=3, k=11, cutoff=None),
+                ],
+                [
+                    dict(kernel_type="rbf"),
+                    dict(kernel_type="spectral"),
+                    dict(kernel_type="locally_periodic"),
+                ],
+            )
         )
     ],
 )
@@ -51,36 +54,40 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
     m = request.param["m"]
     n = request.param["n"] if not square else m
     b = request.param["b"]
-    k = request.param["k"]
     batch = request.param["batch"]
+    k = request.param["k"]
     cutoff = request.param["cutoff"]
     kernel_type = request.param["kernel_type"]
 
     device = torch.device("cuda:0")
-    x1 = torch.sort(torch.rand(batch, m, device=device, dtype=torch.float32) * 10, dim=1)[0]
-    x2 = torch.sort(torch.rand(batch, n, device=device, dtype=torch.float32) * 10, dim=1)[0]
-    rhs = torch.randn(batch, n, k, device=device, dtype=torch.float32)
-    rhs = rhs / torch.linalg.norm(rhs, dim=(0, 1), keepdim=True)
-    rhs = rhs.unsqueeze(1).expand(batch, b, -1, -1)
+    tkwargs = dict(device=device, dtype=torch.float32)
 
+    x1 = torch.sort(torch.rand(batch, m, **tkwargs) * 10, dim=-1)[0]
+    if square:
+        x2 = x1
+    else:
+        x2 = torch.sort(torch.rand(batch, n, **tkwargs) * 10, dim=-1)[0]
     start, end = make_ranges(cutoff, x1, x2)
+    rhs = torch.randn(batch, n, k, **tkwargs)
+    rhs = rhs / torch.linalg.norm(rhs, dim=-2, keepdim=True)
+    rhs = rhs.unsqueeze(1).expand(batch, b, n, k)
 
     if kernel_type == "rbf":
-        lengthscale = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        outputscale = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        params = torch.stack([lengthscale, outputscale], dim=0)
+        lengthscale = 1 + torch.rand(batch, b, **tkwargs)
+        outputscale = 1 + torch.rand(batch, b, **tkwargs)
+        params = torch.stack([lengthscale, outputscale], dim=-1)
     elif kernel_type == "spectral":
-        lengthscale = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        frequency = 0.5 + torch.rand(b, device=device, dtype=torch.float32) * 0.5
-        outputscale = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        params = torch.stack([lengthscale, frequency, outputscale], dim=0)
+        lengthscale = 1 + torch.rand(batch, b, **tkwargs)
+        frequency = 0.5 + torch.rand(batch, b, **tkwargs) * 0.5
+        outputscale = 1 + torch.rand(batch, b, **tkwargs)
+        params = torch.stack([lengthscale, frequency, outputscale], dim=-1)
     elif kernel_type == "locally_periodic":
-        lengthscale_rbf = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        lengthscale_periodic = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        period_length = 1 + torch.rand(b, device=device, dtype=torch.float32)
-        outputscale = 1 + torch.rand(b, device=device, dtype=torch.float32)
+        lengthscale_rbf = 1 + torch.rand(batch, b, **tkwargs)
+        lengthscale_periodic = 1 + torch.rand(batch, b, **tkwargs)
+        period_length = 1 + torch.rand(batch, b, **tkwargs)
+        outputscale = 1 + torch.rand(batch, b, **tkwargs)
         params = torch.stack(
-            [lengthscale_rbf, lengthscale_periodic, period_length, outputscale], dim=0
+            [lengthscale_rbf, lengthscale_periodic, period_length, outputscale], dim=-1
         )
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
@@ -115,21 +122,21 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
 
     kernel_type = example_data.kernel_type
     params = example_data.params
-    batch_shape = example_data.params.shape[1:]
-    x1_ = example_data.x1[:, None, :, None]
-    x2_ = example_data.x2[:, None, :, None]
+    batch_shape = torch.Size((params.shape[0], params.shape[1]))
+    x1_ = example_data.x1[..., None, :, None]
+    x2_ = example_data.x2[..., None, :, None]
     if kernel_type == "rbf":
-        lengthscale = params[0]
-        outputscale = params[1]
+        lengthscale = params[..., 0]
+        outputscale = params[..., 1]
         gpytorch_kernel = ScaleKernel(RBFKernel(batch_shape=batch_shape), batch_shape=batch_shape)
         gpytorch_kernel.to(example_data.x1.device)
         with_grads(gpytorch_kernel, "outputscale", outputscale)
-        with_grads(gpytorch_kernel.base_kernel, "lengthscale", lengthscale[:, None, None])
+        with_grads(gpytorch_kernel.base_kernel, "lengthscale", lengthscale[..., None, None])
         kernel = gpytorch_kernel(x1_, x2_).to_dense()
     elif kernel_type == "spectral":
-        lengthscale = params[0]
-        frequency = params[1]
-        outputscale = params[2]
+        lengthscale = params[..., 0]
+        frequency = params[..., 1]
+        outputscale = params[..., 2]
         gpytorch_kernel = SpectralMixtureKernel(num_mixtures=1, batch_shape=batch_shape)
         gpytorch_kernel.to(example_data.x1.device)
         with_grads(
@@ -141,10 +148,10 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
         with_grads(gpytorch_kernel, "mixture_weights", outputscale[..., None])
         kernel = gpytorch_kernel(x1_, x2_).to_dense()
     elif kernel_type == "locally_periodic":
-        lengthscale_rbf = params[0]
-        lengthscale_periodic = params[1]
-        period_length = params[2]
-        outputscale = params[3]
+        lengthscale_rbf = params[..., 0]
+        lengthscale_periodic = params[..., 1]
+        period_length = params[..., 2]
+        outputscale = params[..., 3]
         gpytorch_kernel = ScaleKernel(
             ProductKernel(
                 RBFKernel(batch_shape=batch_shape),
@@ -155,15 +162,15 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
         gpytorch_kernel.to(example_data.x1.device)
         with_grads(gpytorch_kernel, "outputscale", outputscale)
         with_grads(
-            gpytorch_kernel.base_kernel.kernels[0], "lengthscale", lengthscale_rbf[:, None, None]
+            gpytorch_kernel.base_kernel.kernels[0], "lengthscale", lengthscale_rbf[..., None, None]
         )
         with_grads(
             gpytorch_kernel.base_kernel.kernels[1],
             "lengthscale",
-            lengthscale_periodic[:, None, None],
+            lengthscale_periodic[..., None, None],
         )
         with_grads(
-            gpytorch_kernel.base_kernel.kernels[1], "period_length", period_length[:, None, None]
+            gpytorch_kernel.base_kernel.kernels[1], "period_length", period_length[..., None, None]
         )
         kernel = gpytorch_kernel(x1_, x2_).to_dense()
     else:

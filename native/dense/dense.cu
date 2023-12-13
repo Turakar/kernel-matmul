@@ -11,7 +11,7 @@
 __global__ void kernel_dense_cuda_kernel(
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
+    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
     torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> out) {
@@ -27,7 +27,7 @@ __global__ void kernel_dense_cuda_kernel(
 
     std::array<float, num_params> params_reg;
     for (int i = 0; i < num_params; i++) {
-        params_reg[i] = params[i][b];
+        params_reg[i] = params[batch][b][i];
     }
 
     const int start_reg = start[batch][blockIdx.x];
@@ -80,7 +80,7 @@ torch::Tensor kernel_dense_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tenso
     kernel_dense_cuda_kernel<<<blocks, threads>>>(
         x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
-        params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         out.packed_accessor32<float, 4, torch::RestrictPtrTraits>());

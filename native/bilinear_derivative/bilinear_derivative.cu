@@ -13,7 +13,7 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
     const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> left_vecs,
     const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> right_vecs,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
+    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
     torch::PackedTensorAccessor32<float, 6, torch::RestrictPtrTraits> params_grad) {
@@ -46,7 +46,7 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
     // Load params to registers
     std::array<float, num_params> params_reg = {};
     for (int i = 0; i < num_params; i++) {
-        params_reg[i] = params[i][blockIdx.y];
+        params_reg[i] = params[batch][blockIdx.y][i];
     }
 
     // Loop over x2
@@ -118,7 +118,7 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
 
     // Write output to global memory
     for (int p = 0; p < num_params; p++) {
-        params_grad[batch][p][blockIdx.y][blockIdx.x][threadIdx.y][threadIdx.x] = accumulator[p];
+        params_grad[batch][blockIdx.y][p][blockIdx.x][threadIdx.y][threadIdx.x] = accumulator[p];
     }
 }
 
@@ -129,7 +129,7 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     const int block_size = KM_BLOCK_SIZE;
     const int thread_dim = KM_BILINEAR_DERIVATIVE_THREAD_DIM;
     const int per_thread = KM_BILINEAR_DERIVATIVE_PER_THREAD;
-    const int batch = x1.size(0);
+    const int batch = params.size(0);
 
     const dim3 threads{thread_dim, thread_dim, 1};
     const dim3 blocks{KM_CEIL_DIV(x1.size(1), block_size), params.size(1), batch};
@@ -137,7 +137,7 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());
     auto out = torch::zeros(
-        {batch, params.size(0), params.size(1), blocks.x, thread_dim, thread_dim}, out_opts);
+        {batch, params.size(1), params.size(2), blocks.x, thread_dim, thread_dim}, out_opts);
 
 #ifdef PRINT_SIZE
     printf("m, n, k, b, batch: (%d, %d, %d, %d, %d)\n", x1.size(1), x2.size(1), left_vecs.size(1),
@@ -154,7 +154,7 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
         x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         left_vecs_t.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         right_vecs_t.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
-        params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         out.packed_accessor32<float, 6, torch::RestrictPtrTraits>());
@@ -164,5 +164,5 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     gpuErrchk(cudaDeviceSynchronize());
 #endif
 
-    return out.sum({0, 3, 4, 5});
+    return out.sum({3, 4, 5});
 }

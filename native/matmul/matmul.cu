@@ -12,7 +12,7 @@ __global__ void kernel_matmul_vector_cuda_kernel(
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
     const torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> rhs,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
+    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
     torch::PackedTensorAccessor32<float, 4, torch::RestrictPtrTraits> out) {
@@ -27,7 +27,7 @@ __global__ void kernel_matmul_vector_cuda_kernel(
     // Load parameters to registers
     std::array<float, KM_NUM_PARAMS> reg_params;
     for (int i = 0; i < KM_NUM_PARAMS; i++) {
-        reg_params[i] = params[i][b];
+        reg_params[i] = params[batch][b][i];
     }
 
     // Each thread computes values for entries m_base + i * KM_MATMUL_THREADS
@@ -117,22 +117,23 @@ torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tens
     const dim3 blocks{
         KM_CEIL_DIV(x1.size(1), KM_BLOCK_SIZE),
         KM_CEIL_DIV(rhs.size(3), KM_MATMUL_K_BLOCK_SIZE),
-        params.size(1) * x1.size(0),
+        params.size(0) * params.size(1),
     };
 
 #ifdef KM_DEBUG_PRINT_SIZE
-    printf("m, n, b, k: (%d, %d, %d, %d)\n", x1.size(1), x2.size(1), params.size(1), rhs.size(3));
+    printf("m, n, b, k, batch: (%d, %d, %d, %d, %d)\n", x1.size(1), x2.size(1), params.size(1),
+           rhs.size(3), params.size(0));
     printf("threads: (%d, %d, %d)\n", threads.x, threads.y, threads.z);
     printf("blocks: (%d, %d, %d)\n", blocks.x, blocks.y, blocks.z);
 #endif
 
-    out = torch::zeros({x1.size(0), params.size(1), x1.size(1), rhs.size(3)}, out_opts);
+    out = torch::zeros({params.size(0), params.size(1), x1.size(1), rhs.size(3)}, out_opts);
 
     kernel_matmul_vector_cuda_kernel<<<blocks, threads>>>(
         x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         rhs.packed_accessor32<float, 4, torch::RestrictPtrTraits>(),
-        params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         out.packed_accessor32<float, 4, torch::RestrictPtrTraits>());

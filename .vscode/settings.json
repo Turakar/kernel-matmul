@@ -82,7 +82,9 @@
         "__split_buffer": "cpp",
         "__tree": "cpp",
         "filesystem": "cpp",
-        "ios": "cpp"
+        "ios": "cpp",
+        "queue": "cpp",
+        "stack": "cpp"
     },
     "python.testing.pytestArgs": [
         "tests"

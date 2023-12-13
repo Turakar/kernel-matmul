@@ -11,7 +11,7 @@
 __global__ void kernel_row_cuda_kernel(
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
     const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2, const int type,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> params,
+    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
     const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
     torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> out) {
@@ -24,7 +24,7 @@ __global__ void kernel_row_cuda_kernel(
 
     std::array<float, num_params> params_reg;
     for (int i = 0; i < num_params; i++) {
-        params_reg[i] = params[i][b];
+        params_reg[i] = params[batch][b][i];
     }
 
     int m;
@@ -57,7 +57,7 @@ torch::Tensor kernel_row_cuda(torch::Tensor x1, torch::Tensor x2, int type, torc
     const int block_size = KM_BLOCK_SIZE;
     const int thread_dim = KM_ROW_THREAD_DIM;
     const int b = params.size(1);
-    const int batch = x1.size(0);
+    const int batch = params.size(0);
 
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());
@@ -69,7 +69,7 @@ torch::Tensor kernel_row_cuda(torch::Tensor x1, torch::Tensor x2, int type, torc
     kernel_row_cuda_kernel<<<blocks, threads>>>(
         x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
         x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(), type,
-        params.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
+        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
         start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
         out.packed_accessor32<float, 3, torch::RestrictPtrTraits>());

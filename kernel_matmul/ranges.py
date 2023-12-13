@@ -37,6 +37,12 @@ _native = _load_native()
 def make_ranges(
     cutoff: float | None, x1: Tensor, x2: Tensor | None = None, *, block_size: int = _BLOCK_SIZE
 ) -> tuple[Tensor, Tensor]:
+    single = x1.dim() == 1
+    if single:
+        x1 = x1.unsqueeze(0)
+        if x2 is not None:
+            x2 = x2.unsqueeze(0)
+
     if cutoff is None:
         rows = int(math.ceil(x1.shape[1] / block_size))
         start = torch.zeros(x1.shape[0], rows, dtype=torch.int32, device=x1.device)
@@ -46,8 +52,12 @@ def make_ranges(
             dtype=torch.int32,
             device=x1.device,
         )
-        return start, end
-    if x2 is None:
-        return _native.make_ranges_symmetric(x1, cutoff, block_size)
+    elif x2 is None:
+        start, end = _native.make_ranges_symmetric(x1, cutoff, block_size)
     else:
-        return _native.make_ranges(x1, x2, cutoff, block_size)
+        start, end = _native.make_ranges(x1, x2, cutoff, block_size)
+
+    if single:
+        start = start.squeeze(0)
+        end = end.squeeze(0)
+    return start, end
