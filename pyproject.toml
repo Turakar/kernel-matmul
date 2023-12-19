@@ -1,8 +1,19 @@
+[project]
+name = "kernel-matmul"
+version = "0.1.0"
+description = "Accelerated multiplications with kernel matrices"
+authors = [
+    { name = "Turakar", email = "turakar23@gmail.com" },
+]
+readme = "README.md"
+
 [build-system]
 requires = ["poetry-core"]
 build-backend = "poetry.core.masonry.api"
 
 [tool.poetry]
+# Needs to be repeated from above as long as the following issue is not fixed:
+# https://github.com/python-poetry/poetry/issues/3332
 name = "kernel-matmul"
 version = "0.1.0"
 description = "Accelerated multiplications with kernel matrices"
@@ -12,9 +23,9 @@ readme = "README.md"
 [tool.poetry.dependencies]
 python = "^3.11,<3.12"
 torch = "^2.1.1"
-gpytorch = "^1.11"
 pytest = "^7.4.3"
 pytest-randomly = "^3.15.0"
+linear_operator = { version = "^0.5.2", optional = true }
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.5.0"
@@ -23,6 +34,11 @@ plotly = "^5.18.0"
 pandas = "^2.1.3"
 pytest-xdist = "^3.5.0"
 pytest-repeat = "^0.9.3"
+gpytorch = "^1.11"
+flaky = "^3.7.0"
+
+[tool.poetry.extras]
+linop = ["linear_operator"]
 
 [tool.ruff]
 line-length = 100
@@ -32,3 +48,7 @@ extend-include = ["*.ipynb"]
 markers = [
     "square: mark test to run only on square kernel matrices",
 ]
+addopts = "--no-flaky-report"
+
+[project.entry-points."pytest_randomly.random_seeder"]
+kernel_matmul = "kernel_matmul:_seed"

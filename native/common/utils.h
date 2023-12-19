@@ -1,6 +1,7 @@
 #pragma once
 
 #define KM_CEIL_DIV(a, b) (((a) + (b)-1) / (b))
+#define KM_CEIL_DIV_SAFE(a, b) ((b) == 1 ? (a) : KM_CEIL_DIV(a, b))
 
 #include <memory>
 #include <stdexcept>

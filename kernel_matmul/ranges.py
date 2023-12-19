@@ -35,7 +35,12 @@ _native = _load_native()
 
 
 def make_ranges(
-    cutoff: float | None, x1: Tensor, x2: Tensor | None = None, *, block_size: int = _BLOCK_SIZE
+    cutoff: float | None,
+    x1: Tensor,
+    x2: Tensor | None = None,
+    *,
+    block_size: int = _BLOCK_SIZE,
+    align: bool = False,
 ) -> tuple[Tensor, Tensor]:
     single = x1.dim() == 1
     if single:
@@ -55,7 +60,28 @@ def make_ranges(
     elif x2 is None:
         start, end = _native.make_ranges_symmetric(x1, cutoff, block_size)
     else:
-        start, end = _native.make_ranges(x1, x2, cutoff, block_size)
+        start, end = _native.make_ranges(x1, x2, cutoff, block_size, align)
+
+    if single:
+        start = start.squeeze(0)
+        end = end.squeeze(0)
+    return start, end
+
+
+def transpose_ranges(
+    start: Tensor, end: Tensor, x1_size: int, x2_size: int, *, block_size: int = _BLOCK_SIZE
+) -> tuple[Tensor, Tensor]:
+    single = start.dim() == 1
+    if single:
+        start = start.unsqueeze(0)
+        end = end.unsqueeze(0)
+
+    if torch.any(start % block_size != 0) or torch.any(
+        torch.logical_and(end % block_size != 0, end != x2_size)
+    ):
+        raise ValueError("Ranges must be block-aligned")
+
+    start, end = _native.transpose_ranges(start, end, x1_size, x2_size, block_size)
 
     if single:
         start = start.squeeze(0)
