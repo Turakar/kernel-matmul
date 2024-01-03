@@ -36,6 +36,7 @@ pytest-xdist = "^3.5.0"
 pytest-repeat = "^0.9.3"
 gpytorch = "^1.11"
 flaky = "^3.7.0"
+pytest-randomly-torch = { path = "pytest-randomly-torch" }
 
 [tool.poetry.extras]
 linop = ["linear_operator"]
@@ -50,6 +51,3 @@ markers = [
     "align: align start / end ranges",
 ]
 addopts = "--no-flaky-report"
-
-[project.entry-points."pytest_randomly.random_seeder"]
-kernel_matmul = "kernel_matmul:_seed"

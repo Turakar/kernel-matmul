@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pytest-randomly-torch"
+version = "0.1.0"
+description = "Add torch to pytest-randomly"
+authors = [
+    { name = "Turakar", email = "turakar23@gmail.com" },
+]
+license = {text = "MIT"}
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.entry-points."pytest_randomly.random_seeder"]
+pytest-randomly-torch = "pytest_randomly_torch:seed"
