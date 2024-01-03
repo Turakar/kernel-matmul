@@ -71,6 +71,11 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
     start, end = make_ranges(cutoff, x1, x2, align=align)
     rhs = torch.randn(batch, n, k, **tkwargs)
     rhs = rhs / torch.linalg.norm(rhs, dim=-2, keepdim=True)
+
+    x1 = x1.unsqueeze(1).expand(batch, b, m)
+    x2 = x2.unsqueeze(1).expand(batch, b, n)
+    start = start.unsqueeze(1).expand(batch, b, -1)
+    end = end.unsqueeze(1).expand(batch, b, -1)
     rhs = rhs.unsqueeze(1).expand(batch, b, n, k)
 
     if kernel_type == "rbf":
@@ -124,8 +129,8 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
     kernel_type = example_data.kernel_type
     params = example_data.params
     batch_shape = torch.Size((params.shape[0], params.shape[1]))
-    x1_ = example_data.x1[..., None, :, None]
-    x2_ = example_data.x2[..., None, :, None]
+    x1_ = example_data.x1[..., None]
+    x2_ = example_data.x2[..., None]
     if kernel_type == "rbf":
         lengthscale = params[..., 0]
         outputscale = params[..., 1]
@@ -178,10 +183,11 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
         raise ValueError(f"Unknown kernel type: {kernel_type}")
     masked_kernel = torch.zeros_like(kernel)
     for batch in range(example_data.start.shape[0]):
-        for i in range(example_data.start.shape[1]):
-            rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
-            columns = slice(example_data.start[batch, i], example_data.end[batch, i])
-            masked_kernel[batch, :, rows, columns] = kernel[batch, :, rows, columns]
+        for b in range(example_data.start.shape[1]):
+            for i in range(example_data.start.shape[2]):
+                rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
+                columns = slice(example_data.start[batch, b, i], example_data.end[batch, b, i])
+                masked_kernel[batch, b, rows, columns] = kernel[batch, b, rows, columns]
 
     if request.cls is not None:
         request.cls.reference_kernel = masked_kernel

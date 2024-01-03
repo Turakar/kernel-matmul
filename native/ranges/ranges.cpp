@@ -120,6 +120,9 @@ std::array<torch::Tensor, 2> transpose_ranges(const torch::Tensor start_any,
     for (int batch = 0; batch < num_batch; batch++) {
         for (int i = 0; i < rows; i++) {
             // proceed block by block
+            if (start_[batch][i] == end_[batch][i]) {
+                continue;
+            }
             const int block_start = start_[batch][i] / block_size;
             const int block_end = KM_CEIL_DIV_SAFE(end_[batch][i], block_size);
             const int row_start = i * block_size;

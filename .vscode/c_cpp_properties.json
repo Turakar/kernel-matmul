@@ -9,6 +9,7 @@
             "defines": [
                 "KM_KERNEL_RBF",
                 "KM_BLOCK_SIZE=128",
+                "KM_BATCH_DIM=2",
                 "KM_MATMUL_K_BLOCK_SIZE=32",
                 "KM_MATMUL_THREADS=64",
                 "KM_MATMUL_PER_THREAD=2",

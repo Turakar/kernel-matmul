@@ -4,6 +4,10 @@
 #error "KM_BLOCK_SIZE must be defined"
 #endif
 
+#ifndef KM_BATCH_DIM
+#error "KM_BATCH_DIM must be defined"
+#endif
+
 #ifndef KM_BILINEAR_DERIVATIVE_THREAD_DIM
 #error "KM_BILINEAR_DERIVATIVE_THREAD_DIM must be defined"
 #endif

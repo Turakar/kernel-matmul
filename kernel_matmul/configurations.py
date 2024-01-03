@@ -30,6 +30,7 @@ class MatmulSingleConfiguration(SingleConfiguration):
         x1, x2, rhs, params, start, end = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             "MATMUL_K_BLOCK_SIZE": min(rhs.shape[-1], 32),
             get_kernel_type_define(self.kernel_type): None,
             "MATMUL_THREADS": 64,
@@ -38,7 +39,7 @@ class MatmulSingleConfiguration(SingleConfiguration):
 
     def cache_key(self, args: tuple) -> str:
         x1, x2, rhs, params, start, end = args
-        return f"{rhs.shape[-1]}"
+        return f"{x1.dim() - 1}_{rhs.shape[-1]}"
 
 
 class MatmulAutotuneConfiguration(Configuration):
@@ -49,6 +50,7 @@ class MatmulAutotuneConfiguration(Configuration):
         x1, x2, rhs, params, start, end = args
         fixed = {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             "MATMUL_K_BLOCK_SIZE": rhs.shape[-1],
             get_kernel_type_define(self.kernel_type): None,
         }
@@ -63,7 +65,7 @@ class MatmulAutotuneConfiguration(Configuration):
 
     def cache_key(self, args: tuple) -> str:
         x1, x2, rhs, params, start, end = args
-        return f"{rhs.shape[-1]}"
+        return f"{x1.dim() - 1}_{rhs.shape[-1]}"
 
 
 class BilinearDerivativeConfiguration(SingleConfiguration):
@@ -71,15 +73,18 @@ class BilinearDerivativeConfiguration(SingleConfiguration):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
+        x1, x2, left_vectors, right_vectors, params, start, end = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
             "BILINEAR_DERIVATIVE_THREAD_DIM": 16,
             "BILINEAR_DERIVATIVE_PER_THREAD": 8,
         }
 
     def cache_key(self, args: tuple) -> str:
-        return ""
+        x1, x2, left_vectors, right_vectors, params, start, end = args
+        return f"{x1.dim() - 1}"
 
 
 class RowConfiguration(SingleConfiguration):
@@ -87,14 +92,17 @@ class RowConfiguration(SingleConfiguration):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
+        x1, x2, row, params, start, end = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
             "ROW_THREAD_DIM": 64,
         }
 
     def cache_key(self, args: tuple) -> str:
-        return ""
+        x1, x2, row, params, start, end = args
+        return f"{x1.dim() - 1}"
 
 
 class DenseConfiguration(SingleConfiguration):
@@ -102,14 +110,17 @@ class DenseConfiguration(SingleConfiguration):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
+        x1, x2, params, start, end = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
             "DENSE_THREAD_DIM": 16,
         }
 
     def cache_key(self, args: tuple) -> str:
-        return ""
+        x1, x2, params, start, end = args
+        return f"{x1.dim() - 1}"
 
 
 class DenseBwdConfiguration(SingleConfiguration):
@@ -117,14 +128,17 @@ class DenseBwdConfiguration(SingleConfiguration):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
+        x1, x2, params, start, end, out_grad = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
             "DENSE_BWD_THREAD_DIM": 16,
         }
 
     def cache_key(self, args: tuple) -> str:
-        return ""
+        x1, x2, params, start, end, out_grad = args
+        return f"{x1.dim() - 1}"
 
 
 class MatmulBwdConfiguration(SingleConfiguration):
@@ -132,15 +146,18 @@ class MatmulBwdConfiguration(SingleConfiguration):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
+        x1, x2, rhs, params, start, end, out_grad = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
             "MATMUL_BWD_THREAD_DIM": 16,
             "MATMUL_BWD_PER_THREAD": 8,
         }
 
     def cache_key(self, args: tuple) -> str:
-        return ""
+        x1, x2, rhs, params, start, end, out_grad = args
+        return f"{x1.dim() - 1}"
 
 
 def get_kernel_type_define(kernel_type: str) -> str:

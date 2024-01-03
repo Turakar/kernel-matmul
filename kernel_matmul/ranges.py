@@ -42,11 +42,15 @@ def make_ranges(
     block_size: int = _BLOCK_SIZE,
     align: bool = False,
 ) -> tuple[Tensor, Tensor]:
-    single = x1.dim() == 1
-    if single:
+    batch_shape = x1.shape[:-1]
+    if len(batch_shape) == 0:
         x1 = x1.unsqueeze(0)
         if x2 is not None:
             x2 = x2.unsqueeze(0)
+    elif len(batch_shape) > 1:
+        x1 = x1.reshape(-1, x1.shape[-1])
+        if x2 is not None:
+            x2 = x2.reshape(-1, x2.shape[-1])
 
     if cutoff is None:
         rows = int(math.ceil(x1.shape[1] / block_size))
@@ -62,28 +66,29 @@ def make_ranges(
     else:
         start, end = _native.make_ranges(x1, x2, cutoff, block_size, align)
 
-    if single:
-        start = start.squeeze(0)
-        end = end.squeeze(0)
+    start = start.reshape(*batch_shape, start.shape[-1])
+    end = end.reshape(*batch_shape, end.shape[-1])
     return start, end
 
 
 def transpose_ranges(
     start: Tensor, end: Tensor, x1_size: int, x2_size: int, *, block_size: int = _BLOCK_SIZE
 ) -> tuple[Tensor, Tensor]:
-    single = start.dim() == 1
-    if single:
-        start = start.unsqueeze(0)
-        end = end.unsqueeze(0)
-
-    if torch.any(start % block_size != 0) or torch.any(
+    if torch.any(torch.logical_and(start % block_size != 0, start != x2_size)) or torch.any(
         torch.logical_and(end % block_size != 0, end != x2_size)
     ):
         raise ValueError("Ranges must be block-aligned")
 
+    batch_shape = start.shape[:-1]
+    if len(batch_shape) == 0:
+        start = start.unsqueeze(0)
+        end = end.unsqueeze(0)
+    elif len(batch_shape) > 1:
+        start = start.reshape(-1, start.shape[-1])
+        end = end.reshape(-1, end.shape[-1])
+
     start, end = _native.transpose_ranges(start, end, x1_size, x2_size, block_size)
 
-    if single:
-        start = start.squeeze(0)
-        end = end.squeeze(0)
+    start = start.reshape(*batch_shape, start.shape[-1])
+    end = end.reshape(*batch_shape, end.shape[-1])
     return start, end

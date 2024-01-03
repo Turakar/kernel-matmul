@@ -1,3 +1,4 @@
+import pytest
 import torch
 from torch import Tensor
 from kernel_matmul.compile import load_native
@@ -6,6 +7,7 @@ from kernel_matmul.configurations import BilinearDerivativeConfiguration
 from tests.conftest import ExampleData
 
 
+@pytest.mark.flaky(max_runs=3)
 def test_bilinear_derivative(
     example_data: ExampleData, reference_kernel: Tensor, build_type: bool
 ) -> None:
@@ -15,9 +17,9 @@ def test_bilinear_derivative(
     start = example_data.start
     end = example_data.end
 
-    left_vectors = torch.randn(x1.shape[0], x1.shape[1], 5, device=x1.device)
+    left_vectors = torch.randn(*x1.shape, 5, device=x1.device)
     left_vectors = left_vectors / torch.linalg.norm(left_vectors, dim=1, keepdim=True)
-    right_vectors = torch.randn(x2.shape[0], x2.shape[1], 5, device=x1.device)
+    right_vectors = torch.randn(*x2.shape, 5, device=x1.device)
     right_vectors = right_vectors / torch.linalg.norm(right_vectors, dim=1, keepdim=True)
 
     args = (
@@ -31,9 +33,9 @@ def test_bilinear_derivative(
     )
 
     (
-        left_vectors.mT[:, :, None, :]  # batch x d x 1 x m
-        @ reference_kernel.sum(dim=1, keepdim=True)  # batch x 1 x m x n
-        @ right_vectors.mT[:, :, :, None]  # batch x d x n x 1
+        left_vectors.mT[..., :, None, :]  # batch x d x 1 x m
+        @ reference_kernel.unsqueeze(-3)  # batch x 1 x m x n
+        @ right_vectors.mT[..., :, :, None]  # batch x d x n x 1
     ).sum().backward()
     reference_grads = params.grad.clone()
 

@@ -1,3 +1,4 @@
+#include "../common/accessor.cuh"
 #include "../common/gpu_assert.cuh"
 #include "../common/kernel_function.cuh"
 #include "../common/utils.h"
@@ -9,20 +10,32 @@
 #include <cuda_runtime.h>
 
 __global__ void kernel_bilinear_derivative_cuda_kernel(
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x1,
-    const torch::PackedTensorAccessor32<float, 2, torch::RestrictPtrTraits> x2,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> left_vecs,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> right_vecs,
-    const torch::PackedTensorAccessor32<float, 3, torch::RestrictPtrTraits> params,
-    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> start,
-    const torch::PackedTensorAccessor32<int, 2, torch::RestrictPtrTraits> end,
-    torch::PackedTensorAccessor32<float, 6, torch::RestrictPtrTraits> params_grad) {
+    const BatchLayout<KM_BATCH_DIM> batch_layout,
+    const BatchedAccessor<float, KM_BATCH_DIM, 1> x1_batch,
+    const BatchedAccessor<float, KM_BATCH_DIM, 1> x2_batch,
+    const BatchedAccessor<float, KM_BATCH_DIM, 2> left_vecs_batch,
+    const BatchedAccessor<float, KM_BATCH_DIM, 2> right_vecs_batch,
+    const BatchedAccessor<float, KM_BATCH_DIM, 1> params_batch,
+    const BatchedAccessor<int, KM_BATCH_DIM, 1> start_batch,
+    const BatchedAccessor<int, KM_BATCH_DIM, 1> end_batch,
+    BatchedAccessor<float, KM_BATCH_DIM, 4> params_grad_batch) {
+
+    // Load batch
+    const auto batch = batch_layout.get_batch(blockIdx.z);
+    const auto x1 = x1_batch[batch];
+    const auto x2 = x2_batch[batch];
+    const auto left_vecs = left_vecs_batch[batch];
+    const auto right_vecs = right_vecs_batch[batch];
+    const auto params = params_batch[batch];
+    const auto start = start_batch[batch];
+    const auto end = end_batch[batch];
+    auto params_grad = params_grad_batch[batch];
+
     // Index calculations
     const int block_size = KM_BLOCK_SIZE;
     const int thread_dim = KM_BILINEAR_DERIVATIVE_THREAD_DIM;
     const int per_thread = KM_BILINEAR_DERIVATIVE_PER_THREAD;
     const int num_params = KM_NUM_PARAMS;
-    const int batch = blockIdx.z;
     static_assert(thread_dim * per_thread == block_size,
                   "block_size must be the product of thread_dim and per_thread");
 
@@ -36,8 +49,8 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
     std::array<float, per_thread> x1_reg = {};
     for (int i = 0; i < per_thread; i++) {
         const auto x1_index = blockIdx.x * block_size + i * thread_dim + threadIdx.x;
-        if (x1_index < x1.size(1)) {
-            x1_reg[i] = x1[batch][x1_index];
+        if (x1_index < x1.size(0)) {
+            x1_reg[i] = x1[x1_index];
         } else {
             x1_reg[i] = 0;
         }
@@ -46,19 +59,19 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
     // Load params to registers
     std::array<float, num_params> params_reg = {};
     for (int i = 0; i < num_params; i++) {
-        params_reg[i] = params[batch][blockIdx.y][i];
+        params_reg[i] = params[i];
     }
 
     // Loop over x2
-    const auto start_m = start[batch][blockIdx.x];
-    const auto end_m = end[batch][blockIdx.x];
+    const auto start_m = start[blockIdx.x];
+    const auto end_m = end[blockIdx.x];
     for (int n = start_m; n < end_m; n += block_size) {
 
         // Load x2 to shared memory
         for (int j = 0; j < per_thread; j++) {
             const auto x2_index = n + j * thread_dim + threadIdx.y;
             if (x2_index < end_m) {
-                shm_x2[j * thread_dim + threadIdx.y] = x2[batch][x2_index];
+                shm_x2[j * thread_dim + threadIdx.y] = x2[x2_index];
             } else {
                 shm_x2[j * thread_dim + threadIdx.y] = 0;
             }
@@ -66,11 +79,11 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
 
         // Compute coefficients from outer product of left and right vectors
         std::array<std::array<float, per_thread>, per_thread> coefficients = {};
-        for (int k = 0; k < left_vecs.size(1); k++) {
+        for (int k = 0; k < left_vecs.size(0); k++) {
             for (int i = 0; i < per_thread; i++) {
                 const auto x1_index = blockIdx.x * block_size + i * thread_dim + threadIdx.x;
-                if (x1_index < x1.size(1)) {
-                    shm_left_vecs[i * thread_dim + threadIdx.x] = left_vecs[batch][k][x1_index];
+                if (x1_index < x1.size(0)) {
+                    shm_left_vecs[i * thread_dim + threadIdx.x] = left_vecs[k][x1_index];
                 } else {
                     shm_left_vecs[i * thread_dim + threadIdx.x] = 0;
                 }
@@ -78,7 +91,7 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
             for (int j = 0; j < per_thread; j++) {
                 const auto x2_index = n + j * thread_dim + threadIdx.y;
                 if (x2_index < end_m) {
-                    shm_right_vecs[j * thread_dim + threadIdx.y] = right_vecs[batch][k][x2_index];
+                    shm_right_vecs[j * thread_dim + threadIdx.y] = right_vecs[k][x2_index];
                 } else {
                     shm_right_vecs[j * thread_dim + threadIdx.y] = 0;
                 }
@@ -118,7 +131,7 @@ __global__ void kernel_bilinear_derivative_cuda_kernel(
 
     // Write output to global memory
     for (int p = 0; p < num_params; p++) {
-        params_grad[batch][blockIdx.y][p][blockIdx.x][threadIdx.y][threadIdx.x] = accumulator[p];
+        params_grad[p][blockIdx.x][threadIdx.y][threadIdx.x] = accumulator[p];
     }
 }
 
@@ -129,40 +142,40 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     const int block_size = KM_BLOCK_SIZE;
     const int thread_dim = KM_BILINEAR_DERIVATIVE_THREAD_DIM;
     const int per_thread = KM_BILINEAR_DERIVATIVE_PER_THREAD;
-    const int batch = params.size(0);
+    const auto batch_layout = BatchLayout<KM_BATCH_DIM>(x1.sizes().data());
 
     const dim3 threads{thread_dim, thread_dim, 1};
-    const dim3 blocks{KM_CEIL_DIV(x1.size(1), block_size), params.size(1), batch};
+    const dim3 blocks{KM_CEIL_DIV(x1.size(-1), block_size), 1, batch_layout.num_batches()};
 
     const auto out_opts =
         torch::TensorOptions().dtype(x1.dtype()).layout(x1.layout()).device(x1.device());
-    auto out = torch::zeros(
-        {batch, params.size(1), params.size(2), blocks.x, thread_dim, thread_dim}, out_opts);
+    const auto out_shape =
+        batch_layout.make_shape<4>({params.size(-1), blocks.x, thread_dim, thread_dim});
+    auto out = torch::zeros(out_shape, out_opts);
 
 #ifdef PRINT_SIZE
-    printf("m, n, k, b, batch: (%d, %d, %d, %d, %d)\n", x1.size(1), x2.size(1), left_vecs.size(1),
-           params.size(1), batch);
+    printf("m, n, k, b, batch: (%d, %d, %d, %d, %d)\n", x1.size(-1), x2.size(-1),
+           left_vecs.size(-2), params.size(1), batch);
     printf("threads: (%d, %d, %d)\n", threads.x, threads.y, threads.z);
     printf("blocks: (%d, %d, %d)\n", blocks.x, blocks.y, blocks.z);
 #endif
 
-    const auto left_vecs_t = left_vecs.transpose(1, 2).contiguous();
-    const auto right_vecs_t = right_vecs.transpose(1, 2).contiguous();
+    const auto left_vecs_t = left_vecs.transpose(-2, -1).contiguous();
+    const auto right_vecs_t = right_vecs.transpose(-2, -1).contiguous();
 
     kernel_bilinear_derivative_cuda_kernel<<<blocks, threads>>>(
-        x1.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
-        x2.packed_accessor32<float, 2, torch::RestrictPtrTraits>(),
-        left_vecs_t.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
-        right_vecs_t.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
-        params.packed_accessor32<float, 3, torch::RestrictPtrTraits>(),
-        start.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
-        end.packed_accessor32<int, 2, torch::RestrictPtrTraits>(),
-        out.packed_accessor32<float, 6, torch::RestrictPtrTraits>());
+        batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
+        BatchedAccessor<float, KM_BATCH_DIM, 2>(left_vecs_t),
+        BatchedAccessor<float, KM_BATCH_DIM, 2>(right_vecs_t),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
+        BatchedAccessor<float, KM_BATCH_DIM, 4>(out));
 
 #ifdef GPU_ASSERT
     gpuErrchk(cudaPeekAtLastError());
     gpuErrchk(cudaDeviceSynchronize());
 #endif
 
-    return out.sum({3, 4, 5});
+    return out.sum({-3, -2, -1});
 }

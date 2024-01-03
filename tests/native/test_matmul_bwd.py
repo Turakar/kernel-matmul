@@ -15,8 +15,7 @@ def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_t
     end = example_data.end
 
     out_grad = torch.randn(
-        params.shape[0],
-        params.shape[1],
+        *params.shape[:-1],
         x1.shape[-1],
         rhs.shape[-1],
         device=x1.device,
