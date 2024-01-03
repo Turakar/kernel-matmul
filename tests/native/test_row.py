@@ -6,7 +6,7 @@ from tests.conftest import ExampleData
 import torch
 
 
-@pytest.mark.square(True)
+@pytest.mark.square()
 def test_diagonal(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
     args = (
         example_data.x1,

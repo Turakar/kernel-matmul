@@ -47,6 +47,7 @@ extend-include = ["*.ipynb"]
 [tool.pytest.ini_options]
 markers = [
     "square: mark test to run only on square kernel matrices",
+    "align: align start / end ranges",
 ]
 addopts = "--no-flaky-report"
 

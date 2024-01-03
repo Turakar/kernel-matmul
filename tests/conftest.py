@@ -50,7 +50,8 @@ class ExampleData:
     ],
 )
 def example_data(request: pytest.FixtureRequest) -> ExampleData:
-    square = request.node.get_closest_marker("square", False)
+    square = request.node.get_closest_marker("square") is not None
+    align = request.node.get_closest_marker("align") is not None
     m = request.param["m"]
     n = request.param["n"] if not square else m
     b = request.param["b"]
@@ -67,7 +68,7 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
         x2 = x1
     else:
         x2 = torch.sort(torch.rand(batch, n, **tkwargs) * 10, dim=-1)[0]
-    start, end = make_ranges(cutoff, x1, x2)
+    start, end = make_ranges(cutoff, x1, x2, align=align)
     rhs = torch.randn(batch, n, k, **tkwargs)
     rhs = rhs / torch.linalg.norm(rhs, dim=-2, keepdim=True)
     rhs = rhs.unsqueeze(1).expand(batch, b, n, k)
