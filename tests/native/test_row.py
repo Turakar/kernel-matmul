@@ -34,7 +34,7 @@ def test_row(
     build_type: bool,
     row: int,
 ) -> None:
-    if row >= example_data.x1.shape[1]:
+    if row >= example_data.x1.shape[-1]:
         pytest.skip("Row index out of bounds")
     args = (
         example_data.x1,
@@ -51,5 +51,5 @@ def test_row(
         defines=defines,
     )
     result = native.call(*args)
-    reference = reference_kernel[:, :, row, :]
+    reference = reference_kernel[..., row, :]
     assert torch.allclose(reference, result, atol=2e-4, rtol=2e-4)

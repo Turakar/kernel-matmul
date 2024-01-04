@@ -14,8 +14,7 @@ def test_dense_bwd(example_data: ExampleData, reference_kernel: Tensor, build_ty
     end = example_data.end
 
     out_grad = torch.randn(
-        params.shape[0],
-        params.shape[1],
+        *params.shape[:-1],
         x1.shape[-1],
         x2.shape[-1],
         device=x1.device,

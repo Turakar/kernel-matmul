@@ -2,7 +2,7 @@
 
 #include <cuda.h>
 
-template <typename scalar_t, size_t batch_dim, size_t nonbatch_dim> class BatchedAccessor {
+template <typename scalar_t, int32_t batch_dim, int32_t nonbatch_dim> class BatchedAccessor {
   public:
     BatchedAccessor(torch::Tensor tensor) {
         static_assert(nonbatch_dim > 0, "nonbatch_dim must be at least 1");
@@ -36,15 +36,17 @@ template <typename scalar_t, size_t batch_dim, size_t nonbatch_dim> class Batche
     int32_t nonbatch_strides[nonbatch_dim];
 };
 
-template <size_t batch_dim> class BatchLayout {
+template <int32_t batch_dim> class BatchLayout {
   public:
     BatchLayout(const int64_t *batch_sizes) {
-        for (int32_t i = batch_dim - 1; i >= 0; i--) {
-            this->batch_sizes[i] = static_cast<int32_t>(batch_sizes[i]);
-            if (i == batch_dim - 1) {
-                this->batch_strides[i] = 1;
-            } else {
-                this->batch_strides[i] = this->batch_strides[i + 1] * this->batch_sizes[i + 1];
+        if (batch_dim > 0) {
+            for (int32_t i = batch_dim - 1; i >= 0; i--) {
+                this->batch_sizes[i] = static_cast<int32_t>(batch_sizes[i]);
+                if (i == batch_dim - 1) {
+                    this->batch_strides[i] = 1;
+                } else {
+                    this->batch_strides[i] = this->batch_strides[i + 1] * this->batch_sizes[i + 1];
+                }
             }
         }
     }
@@ -59,10 +61,13 @@ template <size_t batch_dim> class BatchLayout {
     }
 
     uint32_t num_batches() const {
+        if (batch_dim == 0) {
+            return 1;
+        }
         return static_cast<uint32_t>(this->batch_strides[0] * this->batch_sizes[0]);
     }
 
-    template <size_t nonbatch_dim>
+    template <int32_t nonbatch_dim>
     std::array<int64_t, batch_dim + nonbatch_dim>
     make_shape(std::initializer_list<int64_t> nonbatch_sizes) const {
         std::array<int64_t, batch_dim + nonbatch_dim> shape;
@@ -80,4 +85,5 @@ template <size_t batch_dim> class BatchLayout {
   private:
     int32_t batch_sizes[batch_dim];
     int32_t batch_strides[batch_dim];
+    int32_t _dummy;
 };

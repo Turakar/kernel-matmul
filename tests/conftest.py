@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import itertools
 import random
 import pytest
 from torch import Tensor
@@ -45,10 +46,11 @@ def seed(request) -> int:
         for i, param in enumerate(
             dict_product(
                 [
-                    dict(m=128, n=128, b=1, batch=1, k=1, cutoff=2.0),
-                    dict(m=600, n=800, b=3, batch=1, k=11, cutoff=2.0),
-                    dict(m=500, n=500, b=1, batch=3, k=11, cutoff=2.0),
-                    dict(m=301, n=201, b=4, batch=3, k=11, cutoff=None),
+                    dict(m=128, n=128, batch=(), unsqueeze=None, k=1, cutoff=2.0),
+                    dict(m=600, n=800, batch=(), unsqueeze=None, k=11, cutoff=2.0),
+                    dict(m=500, n=500, batch=(3,), unsqueeze=None, k=11, cutoff=2.0),
+                    dict(m=301, n=201, batch=(3,), unsqueeze=0, k=11, cutoff=None),
+                    dict(m=301, n=199, batch=(2, 3), unsqueeze=1, k=11, cutoff=2.0),
                 ],
                 [
                     dict(kernel_type="rbf"),
@@ -64,44 +66,50 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
     align = request.node.get_closest_marker("align") is not None
     m = request.param["m"]
     n = request.param["n"] if not square else m
-    b = request.param["b"]
     batch = request.param["batch"]
+    unsqueeze = request.param["unsqueeze"]
     k = request.param["k"]
     cutoff = request.param["cutoff"]
     kernel_type = request.param["kernel_type"]
 
+    if unsqueeze is not None:
+        squeeze_batch = (*batch[:unsqueeze], *batch[unsqueeze + 1 :])
+    else:
+        squeeze_batch = batch
+
     device = torch.device("cuda:0")
     tkwargs = dict(device=device, dtype=torch.float32)
 
-    x1 = torch.sort(torch.rand(batch, m, **tkwargs) * 10, dim=-1)[0]
+    x1 = torch.sort(torch.rand(*squeeze_batch, m, **tkwargs) * 10, dim=-1)[0]
     if square:
         x2 = x1
     else:
-        x2 = torch.sort(torch.rand(batch, n, **tkwargs) * 10, dim=-1)[0]
+        x2 = torch.sort(torch.rand(*squeeze_batch, n, **tkwargs) * 10, dim=-1)[0]
     start, end = make_ranges(cutoff, x1, x2, align=align)
-    rhs = torch.randn(batch, n, k, **tkwargs)
+    rhs = torch.randn(*squeeze_batch, n, k, **tkwargs)
     rhs = rhs / torch.linalg.norm(rhs, dim=-2, keepdim=True)
 
-    x1 = x1.unsqueeze(1).expand(batch, b, m)
-    x2 = x2.unsqueeze(1).expand(batch, b, n)
-    start = start.unsqueeze(1).expand(batch, b, -1)
-    end = end.unsqueeze(1).expand(batch, b, -1)
-    rhs = rhs.unsqueeze(1).expand(batch, b, n, k)
+    if unsqueeze is not None:
+        x1 = x1.unsqueeze(unsqueeze).expand(*batch, m)
+        x2 = x2.unsqueeze(unsqueeze).expand(*batch, n)
+        start = start.unsqueeze(unsqueeze).expand(*batch, -1)
+        end = end.unsqueeze(unsqueeze).expand(*batch, -1)
+        rhs = rhs.unsqueeze(unsqueeze).expand(*batch, n, k)
 
     if kernel_type == "rbf":
-        lengthscale = 1 + torch.rand(batch, b, **tkwargs)
-        outputscale = 1 + torch.rand(batch, b, **tkwargs)
+        lengthscale = 1 + torch.rand(batch, **tkwargs)
+        outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack([lengthscale, outputscale], dim=-1)
     elif kernel_type == "spectral":
-        lengthscale = 1 + torch.rand(batch, b, **tkwargs)
-        frequency = 0.5 + torch.rand(batch, b, **tkwargs) * 0.5
-        outputscale = 1 + torch.rand(batch, b, **tkwargs)
+        lengthscale = 1 + torch.rand(batch, **tkwargs)
+        frequency = 0.5 + torch.rand(batch, **tkwargs) * 0.5
+        outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack([lengthscale, frequency, outputscale], dim=-1)
     elif kernel_type == "locally_periodic":
-        lengthscale_rbf = 1 + torch.rand(batch, b, **tkwargs)
-        lengthscale_periodic = 1 + torch.rand(batch, b, **tkwargs)
-        period_length = 1 + torch.rand(batch, b, **tkwargs)
-        outputscale = 1 + torch.rand(batch, b, **tkwargs)
+        lengthscale_rbf = 1 + torch.rand(batch, **tkwargs)
+        lengthscale_periodic = 1 + torch.rand(batch, **tkwargs)
+        period_length = 1 + torch.rand(batch, **tkwargs)
+        outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack(
             [lengthscale_rbf, lengthscale_periodic, period_length, outputscale], dim=-1
         )
@@ -138,7 +146,7 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
 
     kernel_type = example_data.kernel_type
     params = example_data.params
-    batch_shape = torch.Size((params.shape[0], params.shape[1]))
+    batch_shape = params.shape[:-1]
     x1_ = example_data.x1[..., None]
     x2_ = example_data.x2[..., None]
     if kernel_type == "rbf":
@@ -191,13 +199,14 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
         kernel = gpytorch_kernel(x1_, x2_).to_dense()
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
+
     masked_kernel = torch.zeros_like(kernel)
-    for batch in range(example_data.start.shape[0]):
-        for b in range(example_data.start.shape[1]):
-            for i in range(example_data.start.shape[2]):
-                rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
-                columns = slice(example_data.start[batch, b, i], example_data.end[batch, b, i])
-                masked_kernel[batch, b, rows, columns] = kernel[batch, b, rows, columns]
+    batch_indices = itertools.product(*[range(s) for s in batch_shape])
+    for batch in batch_indices:
+        for i in range(example_data.start.shape[-1]):
+            rows = slice(i * _BLOCK_SIZE, (i + 1) * _BLOCK_SIZE)
+            columns = slice(example_data.start[*batch, i], example_data.end[*batch, i])
+            masked_kernel[*batch, rows, columns] = kernel[*batch, rows, columns]
 
     if request.cls is not None:
         request.cls.reference_kernel = masked_kernel
