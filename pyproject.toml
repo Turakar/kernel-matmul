@@ -35,8 +35,7 @@ pandas = "^2.1.3"
 pytest-xdist = "^3.5.0"
 pytest-repeat = "^0.9.3"
 gpytorch = "^1.11"
-flaky = "^3.7.0"
-pytest-randomly-torch = { path = "pytest-randomly-torch" }
+pytest-rerunfailures = "^13.0"
 
 [tool.poetry.extras]
 linop = ["linear_operator"]
@@ -50,4 +49,3 @@ markers = [
     "square: mark test to run only on square kernel matrices",
     "align: align start / end ranges",
 ]
-addopts = "--no-flaky-report"

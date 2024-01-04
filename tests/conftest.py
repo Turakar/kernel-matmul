@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+import random
 import pytest
 from torch import Tensor
 import torch
@@ -27,6 +28,15 @@ class ExampleData:
     end: Tensor
     kernel_type: str
     cutoff: float | None
+
+
+@pytest.fixture(autouse=True)
+def seed(request) -> int:
+    rng = random.Random(f"{request.node.nodeid}_{getattr(request.node, 'execution_count', 0)}")
+    seed = rng.randint(0, 0xFFFF_FFFF_FFFF_FFFF)
+    random.seed(seed)
+    torch.manual_seed(seed)
+    return seed
 
 
 @pytest.fixture(

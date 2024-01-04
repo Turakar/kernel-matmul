@@ -64,17 +64,6 @@ testing = ["covdefaults (>=2.3)", "coverage (>=7.3.2)", "diff-cover (>=8)", "pyt
 typing = ["typing-extensions (>=4.8)"]
 
 [[package]]
-name = "flaky"
-version = "3.7.0"
-description = "Plugin for nose or pytest that automatically reruns flaky tests."
-optional = false
-python-versions = ">=2.7, !=3.0.*, !=3.1.*, !=3.2.*, !=3.3.*"
-files = [
-    {file = "flaky-3.7.0-py2.py3-none-any.whl", hash = "sha256:d6eda73cab5ae7364504b7c44670f70abed9e75f77dd116352f662817592ec9c"},
-    {file = "flaky-3.7.0.tar.gz", hash = "sha256:3ad100780721a1911f57a165809b7ea265a7863305acb66708220820caf8aa0d"},
-]
-
-[[package]]
 name = "fsspec"
 version = "2023.12.2"
 description = "File-system specification"
@@ -699,19 +688,6 @@ files = [
 pytest = "*"
 
 [[package]]
-name = "pytest-randomly-torch"
-version = "0.1.0"
-description = "Add torch to pytest-randomly"
-optional = false
-python-versions = ">=3.10"
-files = []
-develop = false
-
-[package.source]
-type = "directory"
-url = "pytest-randomly-torch"
-
-[[package]]
 name = "pytest-repeat"
 version = "0.9.3"
 description = "pytest plugin for repeating tests"
@@ -724,6 +700,21 @@ files = [
 
 [package.dependencies]
 pytest = "*"
+
+[[package]]
+name = "pytest-rerunfailures"
+version = "13.0"
+description = "pytest plugin to re-run tests to eliminate flaky failures"
+optional = false
+python-versions = ">=3.7"
+files = [
+    {file = "pytest-rerunfailures-13.0.tar.gz", hash = "sha256:e132dbe420bc476f544b96e7036edd0a69707574209b6677263c950d19b09199"},
+    {file = "pytest_rerunfailures-13.0-py3-none-any.whl", hash = "sha256:34919cb3fcb1f8e5d4b940aa75ccdea9661bade925091873b7c6fa5548333069"},
+]
+
+[package.dependencies]
+packaging = ">=17.1"
+pytest = ">=7"
 
 [[package]]
 name = "pytest-xdist"
@@ -1145,4 +1136,4 @@ linop = ["linear_operator"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11,<3.12"
-content-hash = "4c3d4d5901bd48efa0e2ee76b85577b098493d7200bcf0385aa805b56829d349"
+content-hash = "c8ff004417426d7246f4b3a22d63908b1ebf4e389016fa58c5c2270ab49fd5f0"
