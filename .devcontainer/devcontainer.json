@@ -18,10 +18,10 @@
                 "tamasfe.even-better-toml",
                 "nvidia.nsight-vscode-edition",
                 "ms-vscode.cpptools",
-                "ms-vscode.cpptools-themes",
                 "benjamin-simmonds.pythoncpp-debug",
                 "ms-azuretools.vscode-docker",
-                "redhat.vscode-yaml"
+                "redhat.vscode-yaml",
+                "charliermarsh.ruff"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "bash",
