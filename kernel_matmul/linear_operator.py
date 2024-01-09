@@ -1,15 +1,17 @@
-from typing import List
+from typing import List, Tuple
 import torch
 from torch import Tensor
 from linear_operator import LinearOperator
-from torch._C import Size
+from torch import Size, dtype
 from kernel_matmul import ranges
 from kernel_matmul.configurations import (
     MatmulSingleConfiguration,
     MatmulBwdConfiguration,
     DenseConfiguration,
     DenseBwdConfiguration,
+    BilinearDerivativeConfiguration,
 )
+from linear_operator.utils.generic import _to_helper
 
 from kernel_matmul.native_function import NativeFunction
 
@@ -86,6 +88,9 @@ class KernelMatmulLinearOperator(LinearOperator):
         self._native_matmul_bwd = NativeFunction("matmul_bwd", MatmulBwdConfiguration(kernel_type))
         self._native_dense = NativeFunction("dense", DenseConfiguration(kernel_type))
         self._native_dense_bwd = NativeFunction("dense_bwd", DenseBwdConfiguration(kernel_type))
+        self._native_bilinear_derivative = NativeFunction(
+            "bilinear_derivative", BilinearDerivativeConfiguration(kernel_type)
+        )
 
     def _get_args_for_native(
         self, batch_shape: torch.Size
@@ -128,12 +133,11 @@ class KernelMatmulLinearOperator(LinearOperator):
         if self._symmetric:
             return self
         else:
-            x1, x2, _, start, end = self._get_args_for_native(self._batch_shape)
-            start, end = ranges.transpose_ranges(start, end, x1.size(-1), x2.size(-1))
-            start = start.reshape(*self._batch_shape, -1)
-            end = end.reshape(*self._batch_shape, -1)
+            start_t, end_t = ranges.transpose_ranges(
+                self._start, self._end, self._x1.size(-2), self._x2.size(-2)
+            )
             return KernelMatmulLinearOperator(
-                self._x2, self._x1, self._params, start, end, kernel_type=self._kernel_type
+                self._x2, self._x1, self._params, start_t, end_t, kernel_type=self._kernel_type
             )
 
     def to_dense(self) -> Tensor:
@@ -141,7 +145,7 @@ class KernelMatmulLinearOperator(LinearOperator):
         result = _DenseOperator.apply(
             x1, x2, params, start, end, self._native_dense, self._native_dense_bwd
         )
-        return result.reshape(*self.shape)
+        return result
 
     def _expand_batch(self: LinearOperator, batch_shape: Size | List[int]) -> LinearOperator:
         return KernelMatmulLinearOperator(
@@ -152,3 +156,37 @@ class KernelMatmulLinearOperator(LinearOperator):
             self._end.expand(*batch_shape, *self._end.shape[-1:]),
             kernel_type=self._kernel_type,
         )
+
+    def to(self: LinearOperator, *args, **kwargs) -> LinearOperator:
+        device, dtype = _to_helper(*args, **kwargs)
+        if (device is not None and device.type != "cuda") or (
+            dtype is not None and dtype != torch.float32
+        ):
+            raise NotImplementedError("KernelMatmulLinearOperator only supports CUDA and float32")
+        return super().to(*args, **kwargs)
+
+    def type(self: LinearOperator, dtype: dtype) -> LinearOperator:
+        if dtype != torch.float32:
+            raise NotImplementedError("KernelMatmulLinearOperator only supports CUDA and float32")
+        return super().type(dtype)
+
+    def _bilinear_derivative(
+        self, left_vecs: Tensor, right_vecs: Tensor
+    ) -> Tuple[Tensor | None, ...]:
+        # Determine broadcasted batch shape
+        left_vecs_batch = left_vecs.shape[:-2]
+        right_vecs_batch = right_vecs.shape[:-2]
+        batch_shape = torch.broadcast_shapes(left_vecs_batch, right_vecs_batch, self._batch_shape)
+
+        # Broadcast inputs
+        left_vecs = left_vecs.expand(*batch_shape, *left_vecs.shape[-2:])
+        right_vecs = right_vecs.expand(*batch_shape, *right_vecs.shape[-2:])
+        x1, x2, params, start, end = self._get_args_for_native(batch_shape)
+
+        # Calculate
+        result = self._native_bilinear_derivative(x1, x2, left_vecs, right_vecs, params, start, end)
+
+        # Reshape
+        grad = result.reshape(*batch_shape, result.shape[-1])
+
+        return None, None, grad, None, None

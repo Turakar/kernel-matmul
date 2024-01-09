@@ -48,4 +48,5 @@ extend-include = ["*.ipynb"]
 markers = [
     "square: mark test to run only on square kernel matrices",
     "align: align start / end ranges",
+    "stable: use a configuration which is numerically stable (no cutoff, low lengthscale)",
 ]

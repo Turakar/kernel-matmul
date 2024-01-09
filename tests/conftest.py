@@ -64,12 +64,17 @@ def seed(request) -> int:
 def example_data(request: pytest.FixtureRequest) -> ExampleData:
     square = request.node.get_closest_marker("square") is not None
     align = request.node.get_closest_marker("align") is not None
+    stable = request.node.get_closest_marker("stable") is not None
+
+    if stable and not square:
+        pytest.skip("Stable test only implemented for square matrices")
+
     m = request.param["m"]
     n = request.param["n"] if not square else m
     batch = request.param["batch"]
     unsqueeze = request.param["unsqueeze"]
     k = request.param["k"]
-    cutoff = request.param["cutoff"]
+    cutoff = request.param["cutoff"] if not stable else None
     kernel_type = request.param["kernel_type"]
 
     if unsqueeze is not None:
@@ -77,15 +82,23 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
     else:
         squeeze_batch = batch
 
-    device = torch.device("cuda:0")
-    tkwargs = dict(device=device, dtype=torch.float32)
+    tkwargs = dict(device=torch.device("cuda:0"), dtype=torch.float32)
 
-    x1 = torch.sort(torch.rand(*squeeze_batch, m, **tkwargs) * 10, dim=-1)[0]
-    if square:
+    if stable:
+        x1 = torch.linspace(0, 10, m, **tkwargs).expand(*squeeze_batch, m)
         x2 = x1
     else:
-        x2 = torch.sort(torch.rand(*squeeze_batch, n, **tkwargs) * 10, dim=-1)[0]
-    start, end = make_ranges(cutoff, x1, x2, align=align)
+        x1 = torch.sort(torch.rand(*squeeze_batch, m, **tkwargs) * 10, dim=-1)[0]
+        if square:
+            x2 = x1
+        else:
+            x2 = torch.sort(torch.rand(*squeeze_batch, n, **tkwargs) * 10, dim=-1)[0]
+
+    if square:
+        start, end = make_ranges(cutoff, x1, align=align)
+    else:
+        start, end = make_ranges(cutoff, x1, x2, align=align)
+
     rhs = torch.randn(*squeeze_batch, n, k, **tkwargs)
     rhs = rhs / torch.linalg.norm(rhs, dim=-2, keepdim=True)
 
@@ -96,18 +109,20 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
         end = end.unsqueeze(unsqueeze).expand(*batch, -1)
         rhs = rhs.unsqueeze(unsqueeze).expand(*batch, n, k)
 
+    lengthscale_factor = 0.01 if stable else 1.0
+
     if kernel_type == "rbf":
-        lengthscale = 1 + torch.rand(batch, **tkwargs)
+        lengthscale = (1 + torch.rand(batch, **tkwargs)) * lengthscale_factor
         outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack([lengthscale, outputscale], dim=-1)
     elif kernel_type == "spectral":
-        lengthscale = 1 + torch.rand(batch, **tkwargs)
+        lengthscale = (1 + torch.rand(batch, **tkwargs)) * lengthscale_factor
         frequency = 0.5 + torch.rand(batch, **tkwargs) * 0.5
         outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack([lengthscale, frequency, outputscale], dim=-1)
     elif kernel_type == "locally_periodic":
-        lengthscale_rbf = 1 + torch.rand(batch, **tkwargs)
-        lengthscale_periodic = 1 + torch.rand(batch, **tkwargs)
+        lengthscale_rbf = (1 + torch.rand(batch, **tkwargs)) * lengthscale_factor
+        lengthscale_periodic = 1 + torch.rand(batch, **tkwargs) * lengthscale_factor
         period_length = 1 + torch.rand(batch, **tkwargs)
         outputscale = 1 + torch.rand(batch, **tkwargs)
         params = torch.stack(
