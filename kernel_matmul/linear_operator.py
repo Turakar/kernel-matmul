@@ -5,7 +5,7 @@ from linear_operator import LinearOperator
 from torch import Size, dtype
 from kernel_matmul import ranges
 from kernel_matmul.configurations import (
-    MatmulSingleConfiguration,
+    MatmulAutotuneConfiguration,
     MatmulBwdConfiguration,
     DenseConfiguration,
     DenseBwdConfiguration,
@@ -84,7 +84,7 @@ class KernelMatmulLinearOperator(LinearOperator):
         self._batch_shape = x1_batch_shape
         self._symmetric = symmetric
 
-        self._native_matmul = NativeFunction("matmul", MatmulSingleConfiguration(kernel_type))
+        self._native_matmul = NativeFunction("matmul", MatmulAutotuneConfiguration(kernel_type))
         self._native_matmul_bwd = NativeFunction("matmul_bwd", MatmulBwdConfiguration(kernel_type))
         self._native_dense = NativeFunction("dense", DenseConfiguration(kernel_type))
         self._native_dense_bwd = NativeFunction("dense_bwd", DenseBwdConfiguration(kernel_type))
