@@ -19,6 +19,7 @@
             "request": "launch",
             "program": "${file}",
             "console": "integratedTerminal",
+            "justMyCode": false,
             "env": {
                 "KERNEL_MATMUL_COMPILE_DEBUG": "true",
                 "KERNEL_MATMUL_COMPILE_VERBOSE": "true"
@@ -56,6 +57,14 @@
             "request": "attach",
             "processId": "${command:pickProcess}",
             "program": "${workspaceRoot}/.venv/bin/python"
+        },
+        {
+            "name": "Python",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal",
+            "justMyCode": false,
         }
     ]
 }
