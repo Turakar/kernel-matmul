@@ -10,6 +10,8 @@ from kernel_matmul.configurations import (
     DenseConfiguration,
     DenseBwdConfiguration,
     BilinearDerivativeConfiguration,
+    IndexConfiguration,
+    IndexBwdConfiguration,
 )
 from linear_operator.utils.generic import _to_helper
 
@@ -44,6 +46,35 @@ class _DenseOperator(torch.autograd.Function):
         return None, None, grad, None, None, None, None
 
 
+class _IndexOperator(torch.autograd.Function):
+    @staticmethod
+    def forward(
+        ctx,
+        x1,
+        x2,
+        params,
+        start,
+        end,
+        native_index,
+        native_index_bwd,
+        row_index,
+        col_index,
+        *batch_indices,
+    ):
+        ctx.save_for_backward(x1, x2, params, start, end, row_index, col_index, *batch_indices)
+        ctx.native_index_bwd = native_index_bwd
+        return native_index(x1, x2, params, start, end, batch_indices, row_index, col_index)
+
+    @staticmethod
+    def backward(ctx, grad_output):
+        x1, x2, params, start, end, row_index, col_index = ctx.saved_tensors[:8]
+        batch_indices = ctx.saved_tensors[8:]
+        grad = ctx.native_index_bwd(
+            x1, x2, params, start, end, batch_indices, row_index, col_index, grad_output
+        )
+        return None, None, grad, None, None, None, None, None, None, *[None for _ in batch_indices]
+
+
 class KernelMatmulLinearOperator(LinearOperator):
     def __init__(
         self,
@@ -53,15 +84,17 @@ class KernelMatmulLinearOperator(LinearOperator):
         start: Tensor,
         end: Tensor,
         kernel_type: str | None = None,
+        symmetric: bool | None = None,
     ):
-        super().__init__(x1, x2, params, start, end, kernel_type=kernel_type)
+        super().__init__(x1, x2, params, start, end, kernel_type=kernel_type, symmetric=symmetric)
 
         if kernel_type is None:
             raise ValueError("kernel_type must be specified")
         if x1.dim() < 2 or x2.dim() < 2 or x1.size(-1) != 1 or x2.size(-1) != 1:
             raise ValueError("x1 and x2 must have shapes (..., M, 1) and (..., N, 1), respectively")
 
-        symmetric = torch.equal(x1, x2)
+        if symmetric is None:
+            symmetric = torch.equal(x1, x2)
 
         x1_batch_shape = x1.shape[:-2]
         x2_batch_shape = x2.shape[:-2]
@@ -91,6 +124,10 @@ class KernelMatmulLinearOperator(LinearOperator):
         self._native_bilinear_derivative = NativeFunction(
             "bilinear_derivative", BilinearDerivativeConfiguration(kernel_type)
         )
+        # self._native_row = NativeFunction("row", RowConfiguration(kernel_type))
+        # self._native_row_bwd = NativeFunction("row_bwd", RowBwdConfiguration(kernel_type))
+        self._native_index = NativeFunction("index", IndexConfiguration(kernel_type))
+        self._native_index_bwd = NativeFunction("index_bwd", IndexBwdConfiguration(kernel_type))
 
     def _get_args_for_native(
         self, batch_shape: torch.Size
@@ -190,3 +227,25 @@ class KernelMatmulLinearOperator(LinearOperator):
         grad = result.reshape(*batch_shape, result.shape[-1])
 
         return None, None, grad, None, None
+
+    def _get_indices(self, row_index: Tensor, col_index: Tensor, *batch_indices: Tensor) -> Tensor:
+        x1, x2, params, start, end = self._get_args_for_native(self._batch_shape)
+        shape = torch.broadcast_shapes(
+            row_index.shape, col_index.shape, *(b.shape for b in batch_indices)
+        )
+
+        def prepare(index):
+            return index.expand(*shape).to(device=x1.device, dtype=torch.int)
+
+        return _IndexOperator.apply(
+            x1,
+            x2,
+            params,
+            start,
+            end,
+            self._native_index,
+            self._native_index_bwd,
+            prepare(row_index),
+            prepare(col_index),
+            *(prepare(b) for b in batch_indices),
+        )

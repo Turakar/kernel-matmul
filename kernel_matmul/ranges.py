@@ -92,3 +92,27 @@ def transpose_ranges(
     start = start.reshape(*batch_shape, start.shape[-1])
     end = end.reshape(*batch_shape, end.shape[-1])
     return start, end
+
+
+class RangesCache:
+    _cache: dict[float | None, tuple[Tensor, Tensor]]
+
+    def __init__(self, x: Tensor, align: bool = False):
+        self._x = x
+        self._cache = {}
+        self._align = align
+
+    @property
+    def x(self):
+        return self._x
+
+    @property
+    def align(self):
+        return self._align
+
+    def __getitem__(self, cutoff: float | None) -> tuple[Tensor, Tensor]:
+        entry = self._cache.get(cutoff)
+        if entry is None:
+            entry = make_ranges(cutoff, self._x, align=self._align)
+            self._cache[cutoff] = entry
+        return entry

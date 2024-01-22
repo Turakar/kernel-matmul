@@ -92,22 +92,42 @@ class BilinearDerivativeConfiguration(SingleConfiguration):
         return f"{x1.dim() - 1}"
 
 
-class RowConfiguration(SingleConfiguration):
+class IndexConfiguration(SingleConfiguration):
     def __init__(self, kernel_type: str):
         self.kernel_type = kernel_type
 
     def make_config(self, args: tuple) -> Defines:
-        x1, x2, row, params, start, end = args
+        x1, x2, params, start, end, batch_indices, row_index, col_index = args
         return {
             "BLOCK_SIZE": _BLOCK_SIZE,
             "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
-            "ROW_THREAD_DIM": 64,
+            "INDEX_THREAD_DIM": 64,
+            "INDEX_BATCH_DIM": row_index.dim() - 1,
         }
 
     def cache_key(self, args: tuple) -> str:
-        x1, x2, row, params, start, end = args
-        return f"{x1.dim() - 1}"
+        x1, x2, params, start, end, batch_indices, row_index, col_index = args
+        return f"{x1.dim() - 1}_{row_index.dim() - 1}"
+
+
+class IndexBwdConfiguration(SingleConfiguration):
+    def __init__(self, kernel_type: str):
+        self.kernel_type = kernel_type
+
+    def make_config(self, args: tuple) -> Defines:
+        x1, x2, params, start, end, batch_indices, row_index, col_index, out_grad = args
+        return {
+            "BLOCK_SIZE": _BLOCK_SIZE,
+            "BATCH_DIM": x1.dim() - 1,
+            get_kernel_type_define(self.kernel_type): None,
+            "INDEX_BWD_THREAD_DIM": 64,
+            "INDEX_BWD_BATCH_DIM": row_index.dim() - 1,
+        }
+
+    def cache_key(self, args: tuple) -> str:
+        x1, x2, params, start, end, batch_indices, row_index, col_index, out_grad = args
+        return f"{x1.dim() - 1}_{row_index.dim() - 1}"
 
 
 class DenseConfiguration(SingleConfiguration):

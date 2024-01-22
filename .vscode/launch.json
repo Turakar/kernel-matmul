@@ -65,6 +65,9 @@
             "program": "${file}",
             "console": "integratedTerminal",
             "justMyCode": false,
+            "env": {
+                "CUDA_LAUNCH_BLOCKING": "1"
+            }
         }
     ]
 }

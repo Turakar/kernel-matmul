@@ -23,6 +23,9 @@ def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_t
     )
     out_grad = out_grad / torch.linalg.norm(out_grad, dim=(-2, -1), keepdim=True)
 
+    (reference_kernel @ rhs).backward(gradient=out_grad)
+    reference_grads = params.grad.clone()
+
     args = (
         x1,
         x2,
@@ -32,10 +35,6 @@ def test_matmul_bwd(example_data: ExampleData, reference_kernel: Tensor, build_t
         end,
         out_grad,
     )
-
-    (reference_kernel @ rhs).backward(gradient=out_grad)
-    reference_grads = params.grad.clone()
-
     config = MatmulBwdConfiguration(example_data.kernel_type)
     defines = config.make_config(args)
 

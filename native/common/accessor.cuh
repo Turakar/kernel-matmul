@@ -10,6 +10,7 @@ template <typename scalar_t, int32_t batch_dim, int32_t nonbatch_dim> class Batc
         auto strides = tensor.strides().data();
         auto sizes = tensor.sizes().data();
         for (int32_t i = 0; i < batch_dim; i++) {
+            this->batch_sizes[i] = static_cast<int32_t>(sizes[i]);
             this->batch_strides[i] = static_cast<int32_t>(strides[i]);
         }
         for (int32_t i = 0; i < nonbatch_dim; i++) {
@@ -29,8 +30,20 @@ template <typename scalar_t, int32_t batch_dim, int32_t nonbatch_dim> class Batc
             data, this->nonbatch_sizes, this->nonbatch_strides);
     }
 
+    __device__ int32_t size(int32_t dim) const {
+        if (dim < 0) {
+            dim += batch_dim + nonbatch_dim;
+        }
+        if (dim < batch_dim) {
+            return this->batch_sizes[dim];
+        } else {
+            return this->nonbatch_sizes[dim - batch_dim];
+        }
+    }
+
   private:
     scalar_t *data;
+    int32_t batch_sizes[batch_dim];
     int32_t batch_strides[batch_dim];
     int32_t nonbatch_sizes[nonbatch_dim];
     int32_t nonbatch_strides[nonbatch_dim];
