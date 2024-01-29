@@ -1138,4 +1138,4 @@ linop = ["linear_operator"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11,<3.12"
-content-hash = "60083f7639db9383812fc63bf1265e1bf15a990191a3ca3ab87e3dbb2451c0e9"
+content-hash = "8754596a03ada422dc2e835743d04ddb3511302541f889de65d66356eea8dbdb"
