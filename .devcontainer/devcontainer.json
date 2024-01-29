@@ -42,7 +42,6 @@
     "features": {
         "ghcr.io/devcontainers-contrib/features/poetry:2": {}
     },
-    "postStartCommand": "poetry install",
     "containerEnv": {
         "TORCH_EXTENSIONS_DIR": "${containerWorkspaceFolder}/.torch_extensions"
     }
