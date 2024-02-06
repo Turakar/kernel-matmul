@@ -51,6 +51,7 @@ def seed(request) -> int:
                     dict(m=500, n=500, batch=(3,), unsqueeze=None, k=11, cutoff=2.0),
                     dict(m=301, n=201, batch=(3,), unsqueeze=0, k=11, cutoff=None),
                     dict(m=301, n=199, batch=(2, 3), unsqueeze=1, k=11, cutoff=2.0),
+                    dict(m=129, n=130, batch=(), unsqueeze=None, k=65, cutoff=2.0),
                 ],
                 [
                     dict(kernel_type="rbf"),

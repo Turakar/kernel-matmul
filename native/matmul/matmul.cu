@@ -110,7 +110,7 @@ kernel_matmul_vector_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
     for (int m = 0; m < KM_MATMUL_PER_THREAD; m++) {
         const auto m_global = m_base + m * KM_MATMUL_THREADS;
         for (int k = 0; k < KM_MATMUL_K_BLOCK_SIZE; k++) {
-            if (m_global < m_size && k < k_size) {
+            if (m_global < m_size && k_base + k < k_size) {
                 out[m_global][k_base + k] = accumulator[m][k];
             }
         }
