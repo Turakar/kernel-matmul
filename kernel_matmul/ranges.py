@@ -5,6 +5,7 @@ import torch
 from torch import Tensor
 
 from kernel_matmul import _BLOCK_SIZE
+from kernel_matmul.compile import get_native_module_path
 
 with warnings.catch_warnings():
     warnings.filterwarnings(
@@ -21,10 +22,11 @@ def _load_native():
     else:
         name = "km___ranges"
         flags = ["-O3"]
+    module_path = get_native_module_path("ranges")
     return torch.utils.cpp_extension.load(
         name=name,
         sources=[
-            os.path.join("native", "ranges", "ranges.cpp"),
+            os.path.join(module_path, "ranges.cpp"),
         ],
         extra_cflags=flags,
         verbose=False,

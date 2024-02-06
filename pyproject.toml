@@ -19,6 +19,7 @@ version = "0.1.0"
 description = "Accelerated multiplications with kernel matrices"
 authors = ["Turakar <turakar23@gmail.com>"]
 readme = "README.md"
+include = ["native"]
 
 [tool.poetry.dependencies]
 python = "^3.11,<3.12"

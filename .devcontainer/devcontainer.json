@@ -11,8 +11,7 @@
             "extensions": [
                 "github.copilot",
                 "github.copilot-chat",
-                "ms-toolsai.vscode-jupyter-cell-tags",
-                "ms-toolsai.jupyter-renderers",
+                "ms-toolsai.jupyter",
                 "ms-python.python",
                 "njqdev.vscode-python-typehint",
                 "tamasfe.even-better-toml",
@@ -37,7 +36,9 @@
         "--runtime=nvidia",
         "--gpus",
         "all",
-        "--rm"
+        "--rm",
+        "--memory=50g",
+        "--memory-swap=50g" // disable swap
     ],
     "features": {
         "ghcr.io/devcontainers-contrib/features/poetry:2": {}

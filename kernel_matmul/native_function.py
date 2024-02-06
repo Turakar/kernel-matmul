@@ -1,3 +1,4 @@
+import multiprocessing.pool
 from kernel_matmul.compile import find_best, load_native
 from kernel_matmul.configurations import Configuration
 from kernel_matmul.util import format_dict
@@ -17,12 +18,14 @@ class NativeFunction:
         config: Configuration,
         num_measurements: int = 1,
         verbose: bool = False,
+        compile_pool: multiprocessing.pool.Pool | None = None,
     ):
         super().__init__()
         self.name = name
         self.config = config
         self.num_measurements = num_measurements
         self.verbose = verbose
+        self.compile_pool = compile_pool
 
     def __call__(self, *args: Any) -> Any:
         cache_key = self.config.cache_key(args)
@@ -37,6 +40,7 @@ class NativeFunction:
                     candidates,
                     num_measurements=self.num_measurements,
                     return_timings=True,
+                    compile_pool=self.compile_pool,
                 )
                 if self.verbose:
                     for i, timing in enumerate(timings):

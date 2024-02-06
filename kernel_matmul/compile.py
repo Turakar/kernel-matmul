@@ -1,3 +1,5 @@
+import multiprocessing
+import multiprocessing.pool
 import os
 from typing import Any, Callable
 import warnings
@@ -30,13 +32,13 @@ def load_native(
 
     # Find sources
     source_ext = (".cpp", ".cu")
-    common_path = os.path.join("native", "common")
+    common_path = get_native_module_path("common")
     sources = [
         os.path.join(common_path, filename)
         for filename in os.listdir(common_path)
         if filename.endswith(source_ext)
     ]
-    module_path = os.path.join("native", name)
+    module_path = get_native_module_path(name)
     sources += [
         os.path.join(module_path, filename)
         for filename in os.listdir(module_path)
@@ -82,18 +84,47 @@ def load_native(
     )
 
 
+def get_native_module_path(name: str) -> str:
+    return os.path.join(os.path.dirname(__file__), "..", "native", name)
+
+
+def _precompile(name: str, candidate: Defines) -> None:
+    """
+    Compile a candidate if it is not already compiled.
+    This method intentionally returns nothing to allow calling by multiprocessing.
+    """
+    load_native(name, defines=candidate)
+
+
 def find_best(
     name: str,
     args: list[Any],
     candidates: list[Defines],
     return_timings: bool = False,
     num_measurements: int = 1,
+    compile_pool: multiprocessing.pool.Pool | None = None,
 ) -> dict[str, Any] | tuple[dict[str, Any], list[float]]:
+    # Compile all candidates in parallel
+    if compile_pool is not None:
+        results = []
+        for candidate in candidates:
+            results.append(
+                compile_pool.apply_async(_precompile, (name, candidate), error_callback=print)
+            )
+        for result in results:
+            # Join worker processes.
+            # Without a timeout, KeyboardInterrupt is not propagated.
+            # See https://stackoverflow.com/a/1408476/353337
+            result.get(60 * 60 * 24)
+
+    # Measure timings
     timings = []
     for candidate in candidates:
         module = load_native(name, defines=candidate)
         config_timings = cuda_time(lambda: module.call(*args), num_measurements=num_measurements)
         timings.append(sum(config_timings) / len(config_timings))
+
+    # Return best candidate and maybe all timings
     best = candidates[timings.index(min(timings))]
     if return_timings:
         return best, timings

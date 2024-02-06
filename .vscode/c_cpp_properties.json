@@ -4,7 +4,11 @@
             "name": "Linux",
             "includePath": [
                 "${workspaceFolder}/native/**",
-                "${workspaceFolder}/include/**"
+                "${workspaceFolder}/include/torch_0",
+                "${workspaceFolder}/include/torch_1",
+                "${workspaceFolder}/include/torch_3",
+                "${workspaceFolder}/include/torch_4",
+                "${workspaceFolder}/include/python"
             ],
             "defines": [
                 "KM_KERNEL_RBF",
