@@ -20,6 +20,10 @@
 #error "KM_MATMUL_K_BLOCK_SIZE must be defined"
 #endif
 
+#ifndef KM_MATMUL_USE_SHM
+#error "KM_MATMUL_USE_SHM must be defined"
+#endif
+
 #include <torch/types.h>
 
 torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tensor rhs,

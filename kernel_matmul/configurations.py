@@ -2,6 +2,7 @@ import abc
 import itertools
 from kernel_matmul.compile import Defines
 from kernel_matmul import _BLOCK_SIZE
+from kernel_matmul.util import dict_product
 
 
 class Configuration(abc.ABC):
@@ -36,6 +37,7 @@ class MatmulSingleConfiguration(SingleConfiguration):
             get_kernel_type_define(self.kernel_type): None,
             "MATMUL_THREADS": 64,
             "MATMUL_PER_THREAD": 2,
+            "MATMUL_COL_BLOCKS": 1,
         }
 
     def cache_key(self, args: tuple) -> str:
@@ -54,16 +56,28 @@ class MatmulAutotuneConfiguration(Configuration):
             "BATCH_DIM": x1.dim() - 1,
             get_kernel_type_define(self.kernel_type): None,
         }
-        configs = [
-            dict(MATMUL_THREADS=32, MATMUL_PER_THREAD=4),
-            dict(MATMUL_THREADS=64, MATMUL_PER_THREAD=2),
-            dict(MATMUL_THREADS=128, MATMUL_PER_THREAD=1),
-        ]
+        configs = dict_product(
+            [
+                dict(MATMUL_THREADS=32, MATMUL_PER_THREAD=4),
+                dict(MATMUL_THREADS=64, MATMUL_PER_THREAD=2),
+                dict(MATMUL_THREADS=128, MATMUL_PER_THREAD=1),
+            ],
+            [
+                dict(MATMUL_COL_BLOCKS=1),
+                dict(MATMUL_COL_BLOCKS=4),
+                dict(MATMUL_COL_BLOCKS=8),
+                dict(MATMUL_COL_BLOCKS=16),
+            ],
+            [
+                dict(MATMUL_USE_SHM=0),
+                dict(MATMUL_USE_SHM=1),
+            ],
+        )
         k = rhs.shape[-1]
         if k <= 32:
             k_configs = [dict(MATMUL_K_BLOCK_SIZE=k)]
         else:
-            k_configs = [dict(MATMUL_K_BLOCK_SIZE=x) for x in [8, 16, 32, 64]]
+            k_configs = [dict(MATMUL_K_BLOCK_SIZE=x) for x in [16, 32, 64]]
         return [
             fixed | config | k_config for config, k_config in itertools.product(configs, k_configs)
         ]

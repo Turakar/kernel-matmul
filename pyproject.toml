@@ -37,6 +37,7 @@ pytest-randomly = "^3.15.0"
 pytest-xdist = "^3.5.0"
 pytest-repeat = "^0.9.3"
 pytest-rerunfailures = "^13.0"
+click = "^8.1.7"
 
 [tool.poetry.extras]
 linop = ["linear_operator"]

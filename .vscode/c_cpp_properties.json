@@ -17,6 +17,7 @@
                 "KM_MATMUL_K_BLOCK_SIZE=32",
                 "KM_MATMUL_THREADS=64",
                 "KM_MATMUL_PER_THREAD=2",
+                "KM_MATMUL_COL_BLOCKS=2",
                 "KM_BILINEAR_DERIVATIVE_THREAD_DIM=16",
                 "KM_BILINEAR_DERIVATIVE_PER_THREAD=8",
                 "KM_MATMUL_BWD_THREAD_DIM=16",

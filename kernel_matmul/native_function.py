@@ -1,5 +1,5 @@
 import multiprocessing.pool
-from kernel_matmul.compile import find_best, load_native
+from kernel_matmul.compile import Defines, find_best, load_native
 from kernel_matmul.configurations import Configuration
 from kernel_matmul.util import format_dict
 
@@ -26,6 +26,7 @@ class NativeFunction:
         self.num_measurements = num_measurements
         self.verbose = verbose
         self.compile_pool = compile_pool
+        self._defines = None
 
     def __call__(self, *args: Any) -> Any:
         cache_key = self.config.cache_key(args)
@@ -49,5 +50,10 @@ class NativeFunction:
             else:
                 best = candidates[0]
             self._module = load_native(self.name, defines=best)
+            self._defines = best
             self._cache_key = cache_key
         return self._module.call(*args)
+
+    @property
+    def defines(self) -> Defines | None:
+        return self._defines
