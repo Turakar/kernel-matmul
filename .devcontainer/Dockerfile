@@ -9,9 +9,10 @@ RUN apt-get update && \
     DEBIAN_FRONTEND=noninteractive TZ=Etc/UTC apt-get install tzdata && \
     apt-get install -y software-properties-common && \
     add-apt-repository ppa:deadsnakes/ppa && \
-    apt-get install -y git python3.11 python3.11-dev ninja-build gdb nano && \ 
+    apt-get install -y git python3.11 python3.11-dev ninja-build gdb nano sudo && \
+    echo '%sudo ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers && \
     groupadd --gid $USER_GID $USERNAME && \
-    useradd --uid $USER_UID --gid $USER_GID -m $USERNAME -s $SHELL
+    useradd --uid $USER_UID --gid $USER_GID -G sudo -m $USERNAME -s $SHELL
 
 USER $USERNAME
 ENV POETRY_VIRTUALENVS_IN_PROJECT true

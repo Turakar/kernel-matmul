@@ -37,8 +37,11 @@
         "--gpus",
         "all",
         "--rm",
+        // limit memory, disable swap
         "--memory=50g",
-        "--memory-swap=50g" // disable swap
+        "--memory-swap=50g",
+        // for NSight compute
+        "--cap-add=SYS_ADMIN"
     ],
     "features": {
         "ghcr.io/devcontainers-contrib/features/poetry:2": {}
