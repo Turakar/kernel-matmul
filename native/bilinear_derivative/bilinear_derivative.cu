@@ -163,12 +163,14 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     const auto left_vecs_t = left_vecs.transpose(-2, -1).contiguous();
     const auto right_vecs_t = right_vecs.transpose(-2, -1).contiguous();
 
+    const auto params_transformed = transform_params(params);
+
     kernel_bilinear_derivative_cuda_kernel<<<blocks, threads>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
         BatchedAccessor<float, KM_BATCH_DIM, 2>(left_vecs_t),
         BatchedAccessor<float, KM_BATCH_DIM, 2>(right_vecs_t),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         BatchedAccessor<float, KM_BATCH_DIM, 4>(out));
 
@@ -177,5 +179,5 @@ torch::Tensor kernel_bilinear_derivative_cuda(torch::Tensor x1, torch::Tensor x2
     gpuErrchk(cudaDeviceSynchronize());
 #endif
 
-    return out.sum({-3, -2, -1});
+    return transform_params_grad(params, out.sum({-3, -2, -1}));
 }

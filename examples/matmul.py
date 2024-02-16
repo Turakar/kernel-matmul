@@ -37,9 +37,9 @@ def time():
         "KERNEL_RBF": None,
         "MATMUL_THREADS": 64,
         "MATMUL_PER_THREAD": 2,
-        "MATMUL_COL_BLOCKS": 4,
+        "MATMUL_COL_BLOCKS": 1,
         "MATMUL_USE_SHM": 1,
-        "MATMUL_K_BLOCK_SIZE": 1,
+        "MATMUL_K_BLOCK_SIZE": 16,
     }
     x, start, end, parameters, rhs = make_example()
     matmul = load_native("matmul", defines)
@@ -47,7 +47,7 @@ def time():
     event_start = torch.cuda.Event(enable_timing=True)
     event_end = torch.cuda.Event(enable_timing=True)
     timings = []
-    for i in range(10):
+    for _ in range(10):
         event_start.record()
         matmul.call(x, x, rhs, parameters, start, end)
         event_end.record()
@@ -62,9 +62,9 @@ def make_example():
     dt = 1 / 24
     num_samples = 65536
     tkwargs = dict(dtype=torch.float32, device=torch.device("cuda:0"))
-    batch_size = 5
-    cutoff = 100.0
-    rhs_columns = 1
+    batch_size = 1
+    cutoff = 1.0
+    rhs_columns = 256
 
     torch.manual_seed(0)
     x = torch.sort(torch.rand(num_samples, **tkwargs) * dt * num_samples)[0]

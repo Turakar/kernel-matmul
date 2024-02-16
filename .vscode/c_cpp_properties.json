@@ -11,7 +11,8 @@
                 "${workspaceFolder}/include/python"
             ],
             "defines": [
-                "KM_KERNEL_RBF",
+                "KM_KERNEL_COMPACT",
+                "KM_NUM_ORDERS=2",
                 "KM_BLOCK_SIZE=128",
                 "KM_BATCH_DIM=2",
                 "KM_MATMUL_K_BLOCK_SIZE=32",

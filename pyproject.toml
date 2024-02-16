@@ -38,6 +38,8 @@ pytest-xdist = "^3.5.0"
 pytest-repeat = "^0.9.3"
 pytest-rerunfailures = "^13.0"
 click = "^8.1.7"
+ipykernel = "^6.29.2"
+matplotlib = "^3.8.2"
 
 [tool.poetry.extras]
 linop = ["linear_operator"]

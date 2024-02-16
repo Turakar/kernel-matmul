@@ -99,14 +99,18 @@ torch::Tensor kernel_dense_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::T
         batch_layout.make_shape<4>({params.size(-1), blocks.x, threads.y, threads.x});
     auto out = torch::zeros(out_shape, out_opts);
 
+    const auto params_transformed = transform_params(params);
+
     kernel_dense_bwd_cuda_kernel<<<blocks, threads>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         BatchedAccessor<float, KM_BATCH_DIM, 2>(out_grad),
         BatchedAccessor<float, KM_BATCH_DIM, 4>(out));
 
     KM_DO_GPU_ASSERT;
-    return out.sum({-3, -2, -1});
+
+    const auto grad = out.sum({-3, -2, -1});
+    return transform_params_grad(params, grad);
 }

@@ -10,8 +10,6 @@ def test_dense_bwd(example_data: ExampleData, reference_kernel: Tensor, build_ty
     x1 = example_data.x1
     x2 = example_data.x2
     params = example_data.params
-    start = example_data.start
-    end = example_data.end
 
     out_grad = torch.randn(
         *params.shape[:-1],
@@ -22,21 +20,19 @@ def test_dense_bwd(example_data: ExampleData, reference_kernel: Tensor, build_ty
     )
     out_grad = out_grad / torch.linalg.norm(out_grad, dim=(-2, -1), keepdim=True)
 
+    reference_kernel.backward(gradient=out_grad)
+    reference_grads = params.grad.clone()
+
     args = (
         x1,
         x2,
         params,
-        start,
-        end,
+        example_data.start,
+        example_data.end,
         out_grad,
     )
-
-    reference_kernel.backward(gradient=out_grad)
-    reference_grads = params.grad.clone()
-
     config = DenseBwdConfiguration(example_data.kernel_type)
     defines = config.make_config(args)
-
     with torch.no_grad():
         native = load_native(
             name="dense_bwd",

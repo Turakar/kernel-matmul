@@ -58,7 +58,7 @@ kernel_matmul_vector_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
         }
     }
 
-#if MATMUL_USE_SHM == 1
+#if KM_MATMUL_USE_SHM == 1
     // We buffer the x2 and rhs in shm as these are read multiple times
     __shared__ std::array<float, KM_BLOCK_SIZE> shm_x2;
     __shared__ std::array<std::array<float, KM_MATMUL_K_BLOCK_SIZE>, KM_BLOCK_SIZE> shm_rhs;
@@ -71,7 +71,7 @@ kernel_matmul_vector_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
     const int start_m = start_reg + col_block_size * block_col;
     const int end_m = std::min(end_reg, start_m + col_block_size);
 
-#if MATMUL_USE_SHM == 1
+#if KM_MATMUL_USE_SHM == 1
     for (int n_base = start_m; n_base < end_m; n_base += KM_BLOCK_SIZE) {
 
         // Load x2
@@ -184,10 +184,12 @@ torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tens
     const auto out_shape = batch_layout.make_shape<3>({blocks_col, x1.size(-1), rhs.size(-1)});
     auto out = torch::zeros(out_shape, out_opts);
 
+    const auto params_transformed = transform_params(params);
+
     kernel_matmul_vector_cuda_kernel<<<blocks, threads>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2), BatchedAccessor<float, KM_BATCH_DIM, 2>(rhs),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         BatchedAccessor<float, KM_BATCH_DIM, 3>(out));
 

@@ -85,9 +85,11 @@ torch::Tensor kernel_index_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tenso
     const auto batch_indices_batch = make_batch_accessors(
         batch_indices, std::make_integer_sequence<int, static_cast<int>(KM_BATCH_DIM)>{});
 
+    const auto params_transformed = transform_params(params);
+
     kernel_index_cuda_kernel<<<blocks, threads>>>(
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x1), BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         index_batch_layout, batch_indices_batch,
         BatchedAccessor<int, KM_INDEX_BATCH_DIM, 1>(row_index),

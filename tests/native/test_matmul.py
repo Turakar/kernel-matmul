@@ -20,11 +20,11 @@ def test_matmul(
     )
     config = MatmulSingleConfiguration(example_data.kernel_type)
     defines = config.make_config(args)
+    print(defines)
     assert "MATMUL_COL_BLOCKS" in defines
     defines["MATMUL_COL_BLOCKS"] = 2
     native = load_native("matmul", defines)
     result = native.call(*args)
     reference = reference_kernel @ example_data.rhs
-    print(example_data.start)
-    print(example_data.end)
+    print(example_data.params)
     assert torch.allclose(reference, result, atol=2e-4)

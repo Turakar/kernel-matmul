@@ -15,7 +15,6 @@ from gpytorch.kernels import (
 
 from kernel_matmul.ranges import make_ranges
 from kernel_matmul import _BLOCK_SIZE
-from kernel_matmul.configurations import get_kernel_type_define
 from kernel_matmul.util import dict_product
 
 
@@ -57,6 +56,8 @@ def seed(request) -> int:
                     dict(kernel_type="rbf"),
                     dict(kernel_type="spectral"),
                     dict(kernel_type="locally_periodic"),
+                    # Compact kernels do not work with matmul_bwd, for now.
+                    # dict(kernel_type="compact"),
                 ],
             )
         )
@@ -129,6 +130,16 @@ def example_data(request: pytest.FixtureRequest) -> ExampleData:
         params = torch.stack(
             [lengthscale_rbf, lengthscale_periodic, period_length, outputscale], dim=-1
         )
+    elif kernel_type == "compact":
+        num_orders = 2
+        cutoff = torch.rand((*batch, 1), **tkwargs) + 1.0
+        orders = torch.stack(
+            [torch.randint(1, 5, batch, **tkwargs), torch.randint(5, 10, batch, **tkwargs)], dim=-1
+        )
+        weights = torch.randn((*batch, num_orders, num_orders), **tkwargs)
+        weights = weights @ weights.mT
+        weights = weights / weights.norm(dim=(-2, -1), keepdim=True)
+        params = torch.cat([cutoff, orders, weights.reshape(*batch, -1)], dim=-1)
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
 
@@ -213,6 +224,19 @@ def reference_kernel(request: pytest.FixtureRequest, example_data: ExampleData) 
             gpytorch_kernel.base_kernel.kernels[1], "period_length", period_length[..., None, None]
         )
         kernel = gpytorch_kernel(x1_, x2_).to_dense()
+    elif kernel_type == "compact":
+        num_orders = 2
+        cutoff = params[..., 0]
+        orders = params[..., 1 : 1 + num_orders].int()
+        weights = params[..., 1 + num_orders :].reshape(*batch_shape, num_orders, num_orders)
+        dist = example_data.x1[..., :, None] - example_data.x2[..., None, :]
+        dist = (dist / cutoff[..., None, None]).abs().clamp(max=1.0)
+        orders_plus = orders[..., None, None, :, None] + orders[..., None, None, None, :]
+        orders_minus = orders[..., None, None, :, None] - orders[..., None, None, None, :]
+        cos_term = torch.cos(torch.pi * orders_plus * dist[..., None, None])
+        sinc_term = torch.special.sinc(orders_minus * (1 - dist)[..., None, None])
+        base = cos_term * sinc_term * (1 - dist)[..., None, None]
+        kernel = torch.einsum("...ij,...ji->...", weights[..., None, None, :, :], base)
     else:
         raise ValueError(f"Unknown kernel type: {kernel_type}")
 
@@ -240,8 +264,3 @@ def build_type(request, monkeypatch: pytest.MonkeyPatch) -> bool:
 @pytest.fixture
 def release_build(monkeypatch: pytest.MonkeyPatch) -> None:
     monkeypatch.setenv("KERNEL_MATMUL_COMPILE_DEBUG", "false")
-
-
-@pytest.fixture
-def kernel_define(example_data: ExampleData) -> str:
-    return get_kernel_type_define(example_data.kernel_type)

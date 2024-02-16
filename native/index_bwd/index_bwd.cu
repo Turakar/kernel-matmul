@@ -94,9 +94,11 @@ torch::Tensor kernel_index_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::T
     const auto batch_indices_batch = make_batch_accessors(
         batch_indices, std::make_integer_sequence<int, static_cast<int>(KM_BATCH_DIM)>{});
 
+    const auto params_transformed = transform_params(params);
+
     kernel_index_bwd_cuda_kernel<<<blocks, threads>>>(
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x1), BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         index_batch_layout, batch_indices_batch,
         BatchedAccessor<int, KM_INDEX_BWD_BATCH_DIM, 1>(row_index),
@@ -105,5 +107,6 @@ torch::Tensor kernel_index_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::T
         BatchedAccessor<float, KM_BATCH_DIM, 4>(grad));
 
     KM_DO_GPU_ASSERT;
-    return grad.sum({-3, -2, -1});
+
+    return transform_params_grad(params, grad.sum({-3, -2, -1}));
 }

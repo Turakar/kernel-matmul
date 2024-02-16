@@ -7,18 +7,12 @@ from tests.conftest import ExampleData
 
 
 def test_dense(example_data: ExampleData, reference_kernel: Tensor, build_type: bool) -> None:
-    x1 = example_data.x1
-    x2 = example_data.x2
-    params = example_data.params
-    start = example_data.start
-    end = example_data.end
-
     args = (
-        x1,
-        x2,
-        params,
-        start,
-        end,
+        example_data.x1,
+        example_data.x2,
+        example_data.params,
+        example_data.start,
+        example_data.end,
     )
 
     config = DenseConfiguration(example_data.kernel_type)

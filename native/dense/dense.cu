@@ -84,10 +84,12 @@ torch::Tensor kernel_dense_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tenso
     const dim3 blocks{KM_CEIL_DIV(x1.size(-1), block_size), 1, batch_layout.num_batches()};
     const dim3 threads{thread_dim, thread_dim, 1};
 
+    const auto params_transformed = transform_params(params);
+
     kernel_dense_cuda_kernel<<<blocks, threads>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         BatchedAccessor<float, KM_BATCH_DIM, 2>(out));
 

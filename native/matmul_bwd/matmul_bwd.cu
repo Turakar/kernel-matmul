@@ -193,11 +193,11 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
                       batch_layout.num_batches()};
     const auto shared = (int)(rhs.element_size() * (1 + num_params) * block_size * thread_dim);
 
-#ifdef PRINT_SIZE
+#ifdef KM_DEBUG_PRINT_SIZE
     printf("m, n, k: (%d, %d, %d, )\n", x1.size(-1), x2.size(-1), rhs.size(-1));
     printf("threads: (%d, %d, %d)\n", threads.x, threads.y, threads.z);
     printf("blocks: (%d, %d, %d)\n", blocks.x, blocks.y, blocks.z);
-    printf("shared: %dK\n", KM_CEIL_DIV(shared, 1024)));
+    printf("shared: %dK\n", KM_CEIL_DIV(shared, 1024));
 #endif
 
     const auto out_opts =
@@ -205,15 +205,17 @@ torch::Tensor kernel_matmul_bwd_cuda(torch::Tensor x1, torch::Tensor x2, torch::
     const auto out_shape = batch_layout.make_shape<3>({num_params, x1.size(-1), rhs.size(-1)});
     auto params_grad = torch::zeros(out_shape, out_opts);
 
+    const auto params_transformed = transform_params(params);
+
     kernel_matmul_cuda_kernel_bwd<<<blocks, threads, shared>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2), BatchedAccessor<float, KM_BATCH_DIM, 2>(rhs),
-        BatchedAccessor<float, KM_BATCH_DIM, 1>(params),
+        BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
         BatchedAccessor<int, KM_BATCH_DIM, 1>(start), BatchedAccessor<int, KM_BATCH_DIM, 1>(end),
         BatchedAccessor<float, KM_BATCH_DIM, 2>(out_grad),
         BatchedAccessor<float, KM_BATCH_DIM, 3>(params_grad));
 
     KM_DO_GPU_ASSERT;
 
-    return params_grad.sum({-2, -1});
+    return transform_params_grad(params, params_grad.sum({-2, -1}));
 }
