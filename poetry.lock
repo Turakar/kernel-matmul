@@ -418,6 +418,16 @@ ssh = ["paramiko"]
 tqdm = ["tqdm"]
 
 [[package]]
+name = "gatspy"
+version = "0.3"
+description = "General tools for Astronomical Time Series in Python"
+optional = false
+python-versions = "*"
+files = [
+    {file = "gatspy-0.3.tar.gz", hash = "sha256:5bb9acf524d3583985cf689f7643fb8cb380f20387b6f904b77b468bbaf982bf"},
+]
+
+[[package]]
 name = "gpytorch"
 version = "1.11"
 description = "An implementation of Gaussian Processes in Pytorch"
@@ -1874,7 +1884,7 @@ tests = ["black (>=23.3.0)", "matplotlib (>=3.3.4)", "mypy (>=1.3)", "numpydoc (
 name = "scipy"
 version = "1.12.0"
 description = "Fundamental algorithms for scientific computing in Python"
-optional = true
+optional = false
 python-versions = ">=3.9"
 files = [
     {file = "scipy-1.12.0-cp310-cp310-macosx_10_9_x86_64.whl", hash = "sha256:78e4402e140879387187f7f25d91cc592b3501a2e51dfb320f48dfb73565f10b"},
@@ -2205,4 +2215,4 @@ linop = ["linear_operator"]
 [metadata]
 lock-version = "2.0"
 python-versions = "^3.11,<3.12"
-content-hash = "77af75c6b0a21fa4ec252efd915c9b6cc48ac208e781a549a87dcf551c16c4ec"
+content-hash = "e38dc6752ab8b3ef6b58877d3c4df1be8da947cbdaa84efb9e6d377dd2fb7fc7"

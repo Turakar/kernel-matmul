@@ -63,8 +63,8 @@ def make_example():
     num_samples = 65536
     tkwargs = dict(dtype=torch.float32, device=torch.device("cuda:0"))
     batch_size = 1
-    cutoff = 1.0
-    rhs_columns = 256
+    cutoff = 10.0
+    rhs_columns = 64
 
     torch.manual_seed(0)
     x = torch.sort(torch.rand(num_samples, **tkwargs) * dt * num_samples)[0]

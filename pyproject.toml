@@ -26,6 +26,8 @@ python = "^3.11,<3.12"
 torch = "^2.1.1"
 linear_operator = { version = "^0.5.2", optional = true }
 gpytorch = { version = "^1.11", optional = true }
+gatspy = "^0.3"
+scipy = "^1.12.0"
 
 [tool.poetry.group.dev.dependencies]
 pre-commit = "^3.5.0"
