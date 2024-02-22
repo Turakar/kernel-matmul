@@ -1,3 +1,4 @@
+import multiprocessing
 from typing import List, Tuple
 import torch
 from torch import Tensor
@@ -85,8 +86,18 @@ class KernelMatmulLinearOperator(LinearOperator):
         end: Tensor,
         kernel_type: str | None = None,
         symmetric: bool | None = None,
+        compile_pool: multiprocessing.pool.Pool | None = None,
     ):
-        super().__init__(x1, x2, params, start, end, kernel_type=kernel_type, symmetric=symmetric)
+        super().__init__(
+            x1,
+            x2,
+            params,
+            start,
+            end,
+            kernel_type=kernel_type,
+            symmetric=symmetric,
+            compile_pool=compile_pool,
+        )
 
         if kernel_type is None:
             raise ValueError("kernel_type must be specified")
@@ -117,15 +128,15 @@ class KernelMatmulLinearOperator(LinearOperator):
         self._batch_shape = x1_batch_shape
         self._symmetric = symmetric
 
-        self._native_matmul = NativeFunction("matmul", MatmulAutotuneConfiguration(kernel_type))
+        self._native_matmul = NativeFunction(
+            "matmul", MatmulAutotuneConfiguration(kernel_type), compile_pool=compile_pool
+        )
         self._native_matmul_bwd = NativeFunction("matmul_bwd", MatmulBwdConfiguration(kernel_type))
         self._native_dense = NativeFunction("dense", DenseConfiguration(kernel_type))
         self._native_dense_bwd = NativeFunction("dense_bwd", DenseBwdConfiguration(kernel_type))
         self._native_bilinear_derivative = NativeFunction(
             "bilinear_derivative", BilinearDerivativeConfiguration(kernel_type)
         )
-        # self._native_row = NativeFunction("row", RowConfiguration(kernel_type))
-        # self._native_row_bwd = NativeFunction("row_bwd", RowBwdConfiguration(kernel_type))
         self._native_index = NativeFunction("index", IndexConfiguration(kernel_type))
         self._native_index_bwd = NativeFunction("index_bwd", IndexBwdConfiguration(kernel_type))
 
