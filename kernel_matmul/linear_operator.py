@@ -109,13 +109,15 @@ class KernelMatmulLinearOperator(LinearOperator):
 
         x1_batch_shape = x1.shape[:-2]
         x2_batch_shape = x2.shape[:-2]
+        params_batch_shape = params.shape[:-1]
         start_batch_shape = start.shape[:-1]
         end_batch_shape = end.shape[:-1]
         batch_shape = torch.broadcast_shapes(
-            x1_batch_shape, x2_batch_shape, start_batch_shape, end_batch_shape
+            x1_batch_shape, x2_batch_shape, params_batch_shape, start_batch_shape, end_batch_shape
         )
         x1 = x1.expand(*batch_shape, *x1.shape[-2:])
         x2 = x2.expand(*batch_shape, *x2.shape[-2:])
+        params = params.expand(*batch_shape, *params.shape[-1:])
         start = start.expand(*batch_shape, *start.shape[-1:])
         end = end.expand(*batch_shape, *end.shape[-1:])
 
@@ -125,7 +127,7 @@ class KernelMatmulLinearOperator(LinearOperator):
         self._start = start
         self._end = end
         self._kernel_type = kernel_type
-        self._batch_shape = x1_batch_shape
+        self._batch_shape = batch_shape
         self._symmetric = symmetric
 
         self._native_matmul = NativeFunction(

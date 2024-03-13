@@ -1,3 +1,4 @@
+import multiprocessing
 from kernel_matmul.gpytorch.base import KernelMatmulKernel
 
 
@@ -13,19 +14,28 @@ class SpectralKernelMatmulKernel(KernelMatmulKernel):
         cutoff: float | None = None,
         epsilon: float | None = None,
         batch_shape: Size = torch.Size(()),
-        lengthscale_constraint: Interval | None = GreaterThan(1e-6),
+        lengthscale_constraint: Interval | None = None,
         lengthscale_prior: Prior | None = None,
-        outputscale_constraint: Interval | None = GreaterThan(1e-6),
+        outputscale_constraint: Interval | None = None,
         outputscale_prior: Prior | None = None,
-        frequency_constraint: Interval | None = GreaterThan(1e-6),
+        frequency_constraint: Interval | None = None,
         frequency_prior: Prior | None = None,
+        compile_pool: multiprocessing.pool.Pool | None = None,
     ):
         super().__init__(
             "spectral",
             cutoff,
             epsilon,
             batch_shape,
+            compile_pool=compile_pool,
         )
+
+        if lengthscale_constraint is None:
+            lengthscale_constraint = GreaterThan(1e-6)
+        if outputscale_constraint is None:
+            outputscale_constraint = GreaterThan(1e-6)
+        if frequency_constraint is None:
+            frequency_constraint = GreaterThan(1e-6)
 
         self.raw_lengthscale = nn.Parameter(torch.zeros(batch_shape))
         self.register_constraint("raw_lengthscale", lengthscale_constraint)

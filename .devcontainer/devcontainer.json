@@ -20,7 +20,8 @@
                 "benjamin-simmonds.pythoncpp-debug",
                 "ms-azuretools.vscode-docker",
                 "redhat.vscode-yaml",
-                "charliermarsh.ruff"
+                "charliermarsh.ruff",
+                "mechatroner.rainbow-csv"
             ],
             "settings": {
                 "terminal.integrated.defaultProfile.linux": "bash",

@@ -3,6 +3,7 @@ import multiprocessing.pool
 import os
 from typing import Any, Callable
 import warnings
+from contextlib import contextmanager
 
 import torch
 
@@ -15,6 +16,23 @@ with warnings.catch_warnings():
 
 
 Defines = dict[str, Any]
+
+
+_global_compile_pool: multiprocessing.pool.Pool | None = None
+
+
+@contextmanager
+def compile_pool(processes: int):
+    global _global_compile_pool
+    if _global_compile_pool is not None:
+        raise RuntimeError("compile_pool is already active")
+    _global_compile_pool = multiprocessing.get_context("spawn").Pool(processes)
+    try:
+        yield
+    finally:
+        _global_compile_pool.close()
+        _global_compile_pool.join()
+        _global_compile_pool = None
 
 
 def load_native(
@@ -105,6 +123,8 @@ def find_best(
     compile_pool: multiprocessing.pool.Pool | None = None,
 ) -> dict[str, Any] | tuple[dict[str, Any], list[float]]:
     # Compile all candidates in parallel
+    if compile_pool is None and _global_compile_pool is not None:
+        compile_pool = _global_compile_pool
     if compile_pool is not None:
         results = []
         for candidate in candidates:

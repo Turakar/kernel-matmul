@@ -1,4 +1,5 @@
 import math
+import multiprocessing
 
 import torch
 from kernel_matmul.linear_operator import KernelMatmulLinearOperator
@@ -21,6 +22,7 @@ class KernelMatmulKernel(Kernel, abc.ABC):
         cutoff: float | None,
         epsilon: float | None,
         batch_shape: Size,
+        compile_pool: multiprocessing.pool.Pool | None = None,
     ):
         super().__init__(batch_shape=batch_shape)
 
@@ -30,6 +32,7 @@ class KernelMatmulKernel(Kernel, abc.ABC):
         self._kernel_type = kernel_type
         self._cutoff = cutoff
         self._epsilon = epsilon
+        self._compile_pool = compile_pool
 
     @abc.abstractmethod
     def _get_params(self) -> Tensor:
@@ -70,6 +73,7 @@ class KernelMatmulKernel(Kernel, abc.ABC):
             end,
             kernel_type=self._kernel_type,
             symmetric=x1_eq_x2,
+            compile_pool=self._compile_pool,
         )
 
         if diag:

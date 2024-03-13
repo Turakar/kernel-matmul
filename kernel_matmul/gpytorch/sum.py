@@ -1,5 +1,5 @@
 from gpytorch.kernels import Kernel
-from torch import Tensor
+from torch import Tensor, Size
 from linear_operator.operators import LinearOperator
 
 
@@ -20,3 +20,9 @@ class SumKernel(Kernel):
         else:
             dim = self.dim - 2
         return base.sum(dim=dim)
+
+    @property
+    def batch_shape(self) -> Size:
+        base_shape = list(self.base_kernel.batch_shape)
+        del base_shape[self.dim]
+        return Size(base_shape)
