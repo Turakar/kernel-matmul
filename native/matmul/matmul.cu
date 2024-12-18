@@ -9,17 +9,17 @@
 #include <cuda.h>
 #include <cuda_runtime.h>
 
-__global__ void
-kernel_matmul_vector_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
-                                 BatchedAccessor<float, KM_BATCH_DIM, 1> x1_batch,
-                                 BatchedAccessor<float, KM_BATCH_DIM, 1> x2_batch,
-                                 BatchedAccessor<float, KM_BATCH_DIM, 2> rhs_batch,
-                                 BatchedAccessor<float, KM_BATCH_DIM, 1> params_batch,
-                                 BatchedAccessor<int, KM_BATCH_DIM, 1> start_batch,
-                                 BatchedAccessor<int, KM_BATCH_DIM, 1> end_batch,
-                                 BatchedAccessor<float, KM_BATCH_DIM, 3> out_batch) {
+// Main CUDA implementation of KernelMatmul.
+__global__ void kernel_matmul_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
+                                          BatchedAccessor<float, KM_BATCH_DIM, 1> x1_batch,
+                                          BatchedAccessor<float, KM_BATCH_DIM, 1> x2_batch,
+                                          BatchedAccessor<float, KM_BATCH_DIM, 2> rhs_batch,
+                                          BatchedAccessor<float, KM_BATCH_DIM, 1> params_batch,
+                                          BatchedAccessor<int, KM_BATCH_DIM, 1> start_batch,
+                                          BatchedAccessor<int, KM_BATCH_DIM, 1> end_batch,
+                                          BatchedAccessor<float, KM_BATCH_DIM, 3> out_batch) {
 
-    // Load batch
+    // Select batch
     const auto batch = batch_layout.get_batch(blockIdx.z);
     const auto x1 = x1_batch[batch];
     const auto x2 = x2_batch[batch];
@@ -156,11 +156,15 @@ kernel_matmul_vector_cuda_kernel(BatchLayout<KM_BATCH_DIM> batch_layout,
     }
 }
 
+// Dispatch function for the CUDA KernelMatmul kernel.
 torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tensor rhs,
                                  torch::Tensor params, torch::Tensor start, torch::Tensor end) {
 
+    // Initiate the BatchLayout helper class, which allows for easy iteration over the variable
+    // number of batch dimensions. The batch dimensions of all inputs must match.
     const auto batch_layout = BatchLayout<KM_BATCH_DIM>(x1.sizes().data());
 
+    // Construct the kernel launch configuration (threads, blocks) based on the input shapes.
     const dim3 threads{KM_MATMUL_THREADS, 1, 1};
     const auto blocks_row = static_cast<unsigned int>(KM_CEIL_DIV(x1.size(-1), KM_BLOCK_SIZE));
     const auto blocks_rhs =
@@ -186,7 +190,7 @@ torch::Tensor kernel_matmul_cuda(torch::Tensor x1, torch::Tensor x2, torch::Tens
 
     const auto params_transformed = transform_params(params);
 
-    kernel_matmul_vector_cuda_kernel<<<blocks, threads>>>(
+    kernel_matmul_cuda_kernel<<<blocks, threads>>>(
         batch_layout, BatchedAccessor<float, KM_BATCH_DIM, 1>(x1),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(x2), BatchedAccessor<float, KM_BATCH_DIM, 2>(rhs),
         BatchedAccessor<float, KM_BATCH_DIM, 1>(params_transformed),
