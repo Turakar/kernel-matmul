@@ -77,6 +77,14 @@ class _IndexOperator(torch.autograd.Function):
 
 
 class KernelMatmulLinearOperator(LinearOperator):
+    """LinearOperator implementation for KernelMatmul.
+
+    A KernelMatmulLinearOperator is defined by the inputs x1 and x2, the kernel function and its
+    parameters, and the start and end indices of the kernel function. The kernel function is
+    evaluated for each pair of points in x1 and x2, and the result is a matrix of shape
+    (..., M, N), where M is the number of points in x1 and N is the number of points in x2.
+    """
+
     def __init__(
         self,
         x1: Tensor,
@@ -88,6 +96,23 @@ class KernelMatmulLinearOperator(LinearOperator):
         symmetric: bool | None = None,
         compile_pool: multiprocessing.pool.Pool | None = None,
     ):
+        """Create a KernelMatmulLinearOperator.
+
+        Args:
+            x1 (Tensor): Input x1 of shape (..., M, 1).
+            x2 (Tensor): Input x2 of shape (..., N, 1).
+            params (Tensor): Parameters of the kernel function of shape (..., params).
+            start (Tensor): Start indices of the sparsity pattern of shape (..., blocks).
+            end (Tensor): End indices of the sparsity pattern of shape (..., blocks).
+            kernel_type (str | None, optional): Kernel function name. Required.
+            symmetric (bool | None, optional): Whether this kernel matrix is symmetric.
+                Computed automatically if not provided.
+            compile_pool (multiprocessing.pool.Pool | None, optional): Compile worker pool.
+                Defaults to no multiprocessing or the global compile pool, if active.
+
+        Raises:
+            ValueError: For invalid arguments.
+        """
         super().__init__(
             x1,
             x2,

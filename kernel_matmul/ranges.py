@@ -44,6 +44,22 @@ def make_ranges(
     block_size: int = _BLOCK_SIZE,
     align: bool = False,
 ) -> tuple[Tensor, Tensor]:
+    """Compute the sparsity pattern for a given cutoff and input.
+
+    This function uses an optimized C++ implementation on the CPU.
+
+    Args:
+        cutoff (float | None): The cutoff distance. If None, a dense pattern will be returned.
+        x1 (Tensor): The first input tensor of shape (batch..., n1).
+        x2 (Tensor | None, optional): The second input tensor of shape (batch..., n2).
+            If None, the sparsity pattern will be symmetric. Defaults to None.
+        block_size (int, optional): _description_. Defaults to _BLOCK_SIZE.
+        align (bool, optional): _description_. If the pattern is aligned, its transpose can be
+            computed exactly. Defaults to False.
+
+    Returns:
+        tuple[Tensor, Tensor]: The start and end indices of the blocks in the sparsity pattern.
+    """
     batch_shape = x1.shape[:-1]
     if len(batch_shape) == 0:
         x1 = x1.unsqueeze(0)
@@ -76,6 +92,21 @@ def make_ranges(
 def transpose_ranges(
     start: Tensor, end: Tensor, x1_size: int, x2_size: int, *, block_size: int = _BLOCK_SIZE
 ) -> tuple[Tensor, Tensor]:
+    """Transpose a sparsity pattern.
+
+    Args:
+        start (Tensor): Start indices.
+        end (Tensor): End indices.
+        x1_size (int): Size of x1 (n1).
+        x2_size (int): Size of x2 (n2).
+        block_size (int, optional): _description_. Defaults to _BLOCK_SIZE.
+
+    Raises:
+        ValueError: If the original pattern is not aligned.
+
+    Returns:
+        tuple[Tensor, Tensor]: The start and end indices of the transposed pattern.
+    """
     if torch.any(torch.logical_and(start % block_size != 0, start != x2_size)) or torch.any(
         torch.logical_and(end % block_size != 0, end != x2_size)
     ):
@@ -97,6 +128,11 @@ def transpose_ranges(
 
 
 class RangesCache:
+    """Cache for sparsity patterns for a fixed x = x1 = x2 and variable cutoff.
+
+    Can be used like a dictionary with cutoffs as keys.
+    """
+
     _cache: dict[float | None, tuple[Tensor, Tensor]]
 
     def __init__(self, x: Tensor, align: bool = False):

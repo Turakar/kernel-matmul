@@ -4,6 +4,8 @@ from linear_operator.operators import LinearOperator
 
 
 class SumKernel(Kernel):
+    """Sum over the batch dimension of a kernel."""
+
     has_lengthscale = False
 
     def __init__(self, base_kernel: Kernel, dim: int = -1):

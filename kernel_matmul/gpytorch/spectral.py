@@ -9,6 +9,13 @@ from torch import Size, Tensor, nn
 
 
 class SpectralKernelMatmulKernel(KernelMatmulKernel):
+    """Spectral kernel.
+
+    For multiple components, please use a sum of a batched instance.
+
+    kernel_value = outputscale * exp(-0.5 * (x1 - x2)^2 / lengthscale) * cos(2 * pi * frequency * (x1 - x2))
+    """
+
     def __init__(
         self,
         cutoff: float | None = None,

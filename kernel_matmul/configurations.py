@@ -9,16 +9,44 @@ from torch import Tensor
 
 
 class Configuration(abc.ABC):
+    """Base class for configuration classes.
+
+    A configuration class is responsible for generating a list of defines
+    for a given set of arguments. The defines are used to compile a native
+    module. The configuration class is also responsible for generating a
+    cache key for a given set of arguments.
+    """
+
     @abc.abstractmethod
     def make_candidates(self, args: tuple) -> list[Defines]:
+        """Create candidate configurations (defines) for a given set of arguments.
+
+        Args:
+            args (tuple): Arguments to the native module to generate candidates for.
+
+        Returns:
+            list[Defines]: Candidates.
+        """
         ...
 
     @abc.abstractmethod
     def cache_key(self, args: tuple) -> str:
+        """Create a cache key for a given set of arguments.
+
+        The cache key is used to store the results of the autotuning.
+
+        Args:
+            args (tuple): Arguments to the native module to generate a cache key for.
+
+        Returns:
+            str: Cache key.
+        """
         ...
 
 
 class SingleConfiguration(Configuration):
+    """Base class for configuration classes that only generate a single candidate."""
+
     def make_candidates(self, args: tuple) -> list[Defines]:
         return [self.make_config(args)]
 

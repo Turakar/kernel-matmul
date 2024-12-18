@@ -9,6 +9,11 @@ from torch import Size, Tensor, nn
 
 
 class LocallyPeriodicKernelMatmulKernel(KernelMatmulKernel):
+    """Locally periodic kernel:
+
+    kernel_value = outputscale * exp(-((x1 - x2)^2 * lengthscale_rbf + sin(pi * frequency * (x1 - x2))^2 * lengthscale_periodic))
+    """
+
     def __init__(
         self,
         cutoff: float | None = None,

@@ -18,6 +18,17 @@ V = TypeVar("V")
 
 
 def dict_product(*factors: list[dict[K, V]]) -> list[dict[K, V]]:
+    """Compute the cartesian product of lists of dictionaries.
+
+    Raises:
+        ValueError: If the keys of one list of dicts (a factor) are not the same.
+
+    Args:
+        *factors (list[dict[K, V]]): The factors to compute the cartesian product of.
+
+    Returns:
+        list[dict[K, V]]: The cartesian product of the factors.
+    """
     factors = [factor for factor in factors if len(factor) > 0]
     for factor in factors:
         keys0 = set(factor[0])
@@ -40,7 +51,26 @@ def find_periodogram_peaks(
     min_num_freqs: int = 10000,
     max_num_freqs: int = 1000000,
 ) -> tuple[Tensor, Tensor]:
-    # https://games-uchile.github.io/mogptk/examples.html?q=03_Parameter_Initialization
+    """Find peaks in the Lomb-Scargle periodogram of a time series.
+
+    Based on:
+    https://games-uchile.github.io/mogptk/examples.html?q=03_Parameter_Initialization
+
+    Args:
+        x (Tensor): Time points of shape (n,).
+        y (Tensor): Observations of shape (n, optional: tasks).
+        num_components (int): Number of components to find.
+        max_frequency (float): Maximum frequency to consider.
+        peak_distance (int, optional): Minimum distance between peaks. Defaults to 5.
+        peak_oversample (int, optional): Oversampling factor for peaks. Defaults to 1.
+        sum_tasks (bool, optional): Whether to sum the periodograms of multiple tasks. Defaults to True.
+        min_num_freqs (int, optional): Minimum number of frequencies. Defaults to 10000.
+        max_num_freqs (int, optional): Maximum number of frequencies. Defaults to 1000000.
+
+    Returns:
+        tuple[Tensor, Tensor]: The frequencies and magnitudes of the peaks,
+            both of shape (optional: tasks, num_components).
+    """
 
     single = len(y.shape) == len(x.shape)
     if single:

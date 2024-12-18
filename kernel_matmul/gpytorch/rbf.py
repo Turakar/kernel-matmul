@@ -9,6 +9,11 @@ from torch import Size, nn
 
 
 class RBFKernelMatmulKernel(KernelMatmulKernel):
+    """RBF kernel
+
+    kernel_value = outputscale * exp(-0.5 * (x1 - x2)^2 / lengthscale^2)
+    """
+
     def __init__(
         self,
         cutoff: float | None = None,

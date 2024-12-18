@@ -23,6 +23,17 @@ _global_compile_pool: multiprocessing.pool.Pool | None = None
 
 @contextmanager
 def compile_pool(processes: int):
+    """Context manager to create a compile worker pool.
+
+    This opens a process-wide compile pool for the duration of the context.
+    The global compile pool is then used for all compilations.
+
+    Args:
+        processes (int): Number of worker processes.
+
+    Raises:
+        RuntimeError: If a global compile pool is already activated.
+    """
     global _global_compile_pool
     if _global_compile_pool is not None:
         raise RuntimeError("compile_pool is already active")
@@ -39,6 +50,18 @@ def load_native(
     name: str,
     defines: Defines | None = None,
 ) -> None:
+    """Compiles a module if necessary and loads it.
+
+    Each module and defines combination is compiled only once and cached on disk.
+
+    Args:
+        name (str): Name of the module (directory in native/).
+        defines (Defines | None, optional): Preprocessor defines, as a dict. Defaults to None.
+
+    Returns:
+        _type_: _description_
+    """
+
     # Get compile options from environment variables
     debug = os.environ.get("KERNEL_MATMUL_COMPILE_DEBUG", "false") == "true"
     print_sizes = os.environ.get("KERNEL_MATMUL_COMPILE_PRINT_SIZE", "false") == "true"
@@ -103,6 +126,14 @@ def load_native(
 
 
 def get_native_module_path(name: str) -> str:
+    """Get the path to a native module.
+
+    Args:
+        name (str): Name of the module.
+
+    Returns:
+        str: Path to the module.
+    """
     return os.path.join(os.path.dirname(__file__), "..", "native", name)
 
 
@@ -122,6 +153,24 @@ def find_best(
     num_measurements: int = 1,
     compile_pool: multiprocessing.pool.Pool | None = None,
 ) -> dict[str, Any] | tuple[dict[str, Any], list[float]]:
+    """Autotuning of a native module.
+
+    Mainly used for the KernelMatmul module.
+
+    Args:
+        name (str): Name of the module.
+        args (list[Any]): Arguments to the module (e.g., x and RHS).
+        candidates (list[Defines]): List of preprocessor defines sets to test.
+        return_timings (bool, optional): Whether to return the timings. Defaults to False.
+        num_measurements (int, optional): Number of measurements per candidate. Defaults to 1.
+        compile_pool (multiprocessing.pool.Pool | None, optional): Compile pool to use.
+            If None is given, it uses a global compile if it is open. Defaults to None.
+
+    Returns:
+        dict[str, Any] | tuple[dict[str, Any], list[float]]: If return_timings is False, the best
+            candidate is returned. Otherwise, the best candidate and all timings are returned.
+    """
+
     # Compile all candidates in parallel
     if compile_pool is None and _global_compile_pool is not None:
         compile_pool = _global_compile_pool
@@ -153,6 +202,15 @@ def find_best(
 
 
 def cuda_time(fn: Callable, num_measurements: int | None = None) -> float | list[float]:
+    """Measure the time of a CUDA kernel.
+
+    Args:
+        fn (Callable): Function to measure.
+        num_measurements (int | None, optional): Number of measurements. Defaults to None.
+
+    Returns:
+        float | list[float]: Time in milliseconds.
+    """
     start = torch.cuda.Event(enable_timing=True)
     end = torch.cuda.Event(enable_timing=True)
     single = num_measurements is None

@@ -14,6 +14,8 @@ import abc
 
 
 class KernelMatmulKernel(Kernel, abc.ABC):
+    """Base class for KernelMatmul-based GPyTorch kernels."""
+
     has_lengthscale = False
 
     def __init__(
